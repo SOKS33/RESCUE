@@ -1,0 +1,10 @@
+# RESCUE MAC layer
+
+This is a repository providing an implementation of the RESCUE's MAC layer as a *NS-3.21* module
+
+
+## Download and install NS-3
+
+The provided script *install.sh* will download, extract, and install *NS-3.21* with the developed *rescue* module.
+Just type `./install.sh`.
+
