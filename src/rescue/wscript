@@ -1,0 +1,48 @@
+## -*- Mode: python; py-indent-offset: 4; indent-tabs-mode: nil; coding: utf-8; -*-
+
+def build(bld):
+    module = bld.create_ns3_module('rescue', ['network'])
+    module.source = [
+        'model/rescue-channel.cc',
+        'model/rescue-phy.cc',
+        'model/rescue-phy-header.cc',
+        'model/rescue-mac-header.cc',
+        'model/rescue-mac-csma.cc',
+        'model/rescue-net-device.cc',
+        'model/rescue-mode.cc',
+        'model/rescue-remote-station-manager.cc',
+        'model/constant-rate-rescue-manager.cc',
+        'model/rescue-error-rate-model.cc',
+        'model/rescue-nist-error-rate-model.cc',
+        'model/snr-per-tag.cc',
+        'model/blackbox.cc',
+        'helper/rescue-helper.cc',
+        'helper/rescue-phy-basic-helper.cc',
+        'helper/rescue-mac-csma-helper.cc',
+        ]
+    headers = bld(features=['ns3header'])
+    headers.module = 'rescue'
+    headers.source = [
+        'model/rescue-channel.h',
+        'model/rescue-phy.h',
+        'model/rescue-phy-header.h',
+        'model/rescue-mac.h',
+        'model/rescue-mac-header.h',
+        'model/rescue-mac-csma.h',
+        'model/rescue-net-device.h',
+        'model/rescue-mode.h',
+        'model/rescue-remote-station-manager.h',
+        'model/constant-rate-rescue-manager.h',
+        'model/rescue-error-rate-model.h',
+        'model/rescue-nist-error-rate-model.h',
+        'model/snr-per-tag.h',
+        'model/blackbox.h',
+        'helper/rescue-helper.h',
+        'helper/rescue-phy-basic-helper.h',
+        'helper/rescue-mac-csma-helper.h',
+        ]
+
+    if (bld.env['ENABLE_EXAMPLES']):
+      bld.recurse('examples')
+
+    bld.ns3_python_bindings()
