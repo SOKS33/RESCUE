@@ -1,15 +1,28 @@
 language: cpp
+
 compiler:
   - gcc
   - clang
+
+branches:
+  only:
+    - master
+
 before_install:
   - sudo apt-get update
+
 install:
   - sudo apt-get install build-essential 
   - sudo pip install coveralls
+
 script:
   - ./install.sh --noask
+
 after_success:
   - rm $(find -name '*.gcno' | grep -v '.libs')
   - coveralls
-  - coveralls -r $(pwd)/ibrdtn --exclude ibrcommon/tests --exclude ibrdtn/tests --exclude daemon/tests
+
+notifications:
+  email: false
+
+os: linux
