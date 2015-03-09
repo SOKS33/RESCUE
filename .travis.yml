@@ -6,7 +6,7 @@ before_install:
   - sudo apt-get update
 install:
   - sudo apt-get install build-essential 
-  - pip install coveralls
+  - sudo pip install coveralls
 script:
   - ./install.sh --noask
 after_success:
