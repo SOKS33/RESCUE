@@ -67,12 +67,12 @@ if [ ! -d $path/build ] ; then
     echo -e "${red}Build folder does not exist. Will prompt for ns3 configuration and compilation${default}"
     echo -e "${bold}${blue}This is a new installation ! This script will configure and compile NS-3 ...(Takes 5-10 minutes)"
 
-    if [[ $ask -eq 1 ]] ; then
+    if [[ $noask -eq 0 ]] ; then
         read -p "Are you sure you want to continue? <y/N> " prompt
     fi
 
     echo -e "${default}"
-    if [[ $ask -eq 1 || $prompt == "y" || $prompt == "Y" || $prompt == "yes" || $prompt == "Yes" ]] ; then
+    if [[ $noask -eq 1 || $prompt == "y" || $prompt == "Y" || $prompt == "yes" || $prompt == "Yes" ]] ; then
 	    cd $path
 	    CXXFLAGS="-std=c++0x" ./waf --build-profile=debug --enable-examples --disable-tests --disable-python --enable-modules=rescue,mobility,internet,propagation,applications,flow-monitor configure
         ./waf
