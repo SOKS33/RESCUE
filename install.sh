@@ -1,4 +1,5 @@
 #!/bin/bash
+
 default='\e[0m'
 bold='\e[1m'
 normal='\e[21m'
@@ -33,14 +34,11 @@ if [ ! -d $path ] ; then
     new=1
 fi
 
-#rm -rf $path/userdata/*
-
 echo -e "${green}Creating $path/userdata and its subdirectories${default}"
-for dir in `find userdata -type d`
-do
-	mkdir -p  $path/$dir
-	#echo $path/$dir
-done
+# for dir in `find userdata -type d`
+# do
+# 	mkdir -p  $path/$dir
+# done
 
 for dir in  scratch userdata src
 do
@@ -52,7 +50,8 @@ do
             echo "Creating folder $file"
             mkdir -p $path/$file
         fi
-        #Link each files
+
+        #Link each relevant file
 	    if [[ -f $file && ! `echo $file | grep ".svn" `  && ! `echo $file | grep ".git" `  && ! `echo $file | grep "documentation" ` ]] ; then
 		rm -f $path/$file
         echo "Linking file $file"
@@ -61,6 +60,7 @@ do
 	done
 done
 
+#Configure/Compile NS-3 if needed
 if [ ! -d $path/build ] ; then
     echo -e "${red}Build folder does not exist. Will prompt for ns3 configuration and compilation${default}"
     echo -e "${bold}${blue}This is a new installation ! This script will configure and compile NS-3 ...(Takes 5-10 minutes)"

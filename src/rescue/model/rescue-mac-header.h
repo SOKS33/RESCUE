@@ -35,72 +35,72 @@
 
 namespace ns3 {
 
-/**
- * \ingroup rescue
- *
- * Implements the Rescue MAC header ...do we need it?
- */
-class RescueMacHeader : public Header
-{
-public:
-  RescueMacHeader ();
+  /**
+   * \ingroup rescue
+   *
+   * Implements the Rescue MAC header ...do we need it?
+   */
+  class RescueMacHeader : public Header
+  {
+  public:
+    RescueMacHeader ();
   
-  RescueMacHeader (const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type);
-  virtual ~RescueMacHeader ();
+    RescueMacHeader (const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type);
+    virtual ~RescueMacHeader ();
   
-  static TypeId GetTypeId (void);
+    static TypeId GetTypeId (void);
 
-  /**
-   * \param addr the source address field
-   */
-  void SetSource (Mac48Address addr);
-  /**
-   * \param addr the destination address field
-   */
-  void SetDestination (Mac48Address addr);
-  /**
-   * \param type the type field
-   */
-  void SetType (uint8_t type);
-  /**
-   * \param seq the sequence number field
-   */
-  void SetSequence (uint16_t seq);
+    /**
+     * \param addr the source address field
+     */
+    void SetSource (Mac48Address addr);
+    /**
+     * \param addr the destination address field
+     */
+    void SetDestination (Mac48Address addr);
+    /**
+     * \param type the type field
+     */
+    void SetType (uint8_t type);
+    /**
+     * \param seq the sequence number field
+     */
+    void SetSequence (uint16_t seq);
   
-  /**
-   * \return addr the source address field value
-   */
-  Mac48Address GetSource () const;
-  /**
-   * \return addr the destination address field value
-   */
-  Mac48Address GetDestination () const;
-  /**
-   * \return type the type field value
-   */
-  uint8_t GetType () const;
-  /**
-   * \return seq the sequence number field value
-   */
-  uint16_t GetSequence () const;
-  /**
-   * \return the size of this header
-   */
-  uint32_t GetSize () const;
+    /**
+     * \return addr the source address field value
+     */
+    Mac48Address GetSource () const;
+    /**
+     * \return addr the destination address field value
+     */
+    Mac48Address GetDestination () const;
+    /**
+     * \return type the type field value
+     */
+    uint8_t GetType () const;
+    /**
+     * \return seq the sequence number field value
+     */
+    uint16_t GetSequence () const;
+    /**
+     * \return the size of this header
+     */
+    uint32_t GetSize () const;
 
-  // Inherrited methods
-  virtual uint32_t GetSerializedSize (void) const;
-  virtual void Serialize (Buffer::Iterator start) const;
-  virtual uint32_t Deserialize (Buffer::Iterator start);
-  virtual void Print (std::ostream &os) const;
-  virtual TypeId GetInstanceTypeId (void) const;
+    // Inherrited methods
+    virtual uint32_t GetSerializedSize (void) const;
+    virtual void Serialize (Buffer::Iterator start) const;
+    virtual uint32_t Deserialize (Buffer::Iterator start);
+    virtual void Print (std::ostream &os) const;
+    virtual TypeId GetInstanceTypeId (void) const;
   
-private:
-  Mac48Address m_srcAddr;   //<! source address field
-  Mac48Address m_dstAddr;   //<! destination address field
-  uint8_t m_type;           //<! type field
-  uint16_t m_sequence;      //<! sequence number field
-};
+  private:
+    Mac48Address m_srcAddr;   //<! source address field
+    Mac48Address m_dstAddr;   //<! destination address field
+    uint8_t m_type;           //<! type field
+    uint16_t m_sequence;      //<! sequence number field
+  };
 
 }
 
