@@ -23,12 +23,11 @@ echo
 noask=0
 if [ $# == 1 ] && [ "$1" == "--noask" ] ; then
     noask=1
-    echo "NOASK"
 else
     echo "USAGE: $0 [--noask]"
+    exit -1
 fi
 
-exit
 version="3.21"
 archive="ns-allinone-${version}.tar.bz2"
 path="ns-allinone-${version}/ns-${version}"
