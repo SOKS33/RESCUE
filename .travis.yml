@@ -7,7 +7,7 @@ before_install:
 install:
   - sudo apt-get install build-essential 
 script:
-  - ./install.sh
+  - ./install.sh --noask
 after_success:
   - rm $(find -name '*.gcno' | grep -v '.libs')
   - coveralls -r $(pwd)/ibrdtn --exclude ibrcommon/tests --exclude ibrdtn/tests --exclude daemon/tests
