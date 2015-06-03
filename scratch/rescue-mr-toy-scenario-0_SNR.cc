@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2010 University of Arizona
+ * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -16,26 +16,12 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
- *
- * basing on Simple CSMA/CA Protocol module Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
-/* Node 0 periodically transmits UDP packet to Node 1 through Nodes 2 and 3 (they act as relays)
+/* Node 0 periodically transmits UDP packet to Node 1
  *
- *               Node 2 (Relay)
- *                (x2, y2, 0)
- *                 ^        \  
- *                /          \ 
- *               /            \
- *              /              v
- *      Node 0  --------------> Node 1              
- *    (0, 0, 0) \             (x1, 0, 0)         
- *               \             ^
- *                \           /
- *                 \         /
- *                  v       /
- *               Node 3 (Relay)
- *                (x3, y3, 0)
+ *   Node 0 (Source) ---------> Node 1 (Destination)             
+ *    (0, 0, 0)                  (x1, 0, 0)         
  */
 
 #include "ns3/core-module.h"
@@ -43,17 +29,20 @@
 #include "ns3/mobility-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/applications-module.h"
-#include "ns3/flow-monitor-module.h"
+//#include "ns3/flow-monitor-module.h"
 #include "ns3/rng-seed-manager.h"
 
 #include "ns3/rescue-channel.h"
-#include "ns3/rescue-mac-csma-helper.h"
+#include "ns3/adhoc-rescue-mac-helper.h"
 #include "ns3/rescue-phy-basic-helper.h"
+#include "ns3/rescue-mac-header.h"
+
 #include <vector>
+#include <bitset>
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE("RescueToyScenario3");
+NS_LOG_COMPONENT_DEFINE("RescueToyScenario1");
 
 
 
@@ -67,6 +56,23 @@ public:
 	static void PopulateArpCache ();
     static std::string MapPhyRateToString (uint32_t phyRate);
 };
+
+Time start = Seconds (5);
+Time end = Seconds (25);
+
+uint32_t m_send = 0;
+uint32_t m_received = 0;
+uint64_t m_send_bytes = 0;
+uint64_t m_received_bytes = 0;
+Time m_lastDelay = Seconds (0);
+Time m_delaySum = Seconds (0);
+Time m_jitterSum = Seconds (0);
+
+typedef std::map<uint64_t, Time> Packets;
+typedef std::map<uint64_t, Time>::reverse_iterator PacketsRI;
+typedef std::map<uint64_t, Time>::iterator PacketsI;
+
+Packets m_sentFrames;
 
 std::string
 SimulationHelper::MapPhyRateToString (uint32_t phyRate)
@@ -150,54 +156,96 @@ SimulationHelper::PopulateArpCache () {
 
 
 
+/* =========== Trace functions =========== */
+
+void
+EnqueueOkTrace (std::string context, uint32_t node, uint32_t iff, Ptr<const Packet> pkt, const RescueMacHeader &hdr)
+{
+  //std::cout << Simulator::Now ().GetSeconds () << "\tENQUEUE, TX to: \t" << hdr.GetDestination () << "\t" << *pkt << std::endl;
+  m_sentFrames.insert (std::pair<uint64_t, Time> (pkt->GetUid (), Simulator::Now ()) );
+  if (Simulator::Now () > start)
+    {
+      m_send++;
+      m_send_bytes += pkt->GetSize ();
+    }
+}
+
+void
+DataRxOkTrace (std::string context, uint32_t node, uint32_t iff, Ptr<const Packet> pkt, const RescuePhyHeader &hdr)
+{
+  //std::cout << Simulator::Now ().GetSeconds () << "\tRX OK, from: \t" << hdr.GetSource () << "\t" << *pkt << std::endl;
+  Packets::iterator it = m_sentFrames.find (pkt->GetUid ());
+  if (it != m_sentFrames.end ())
+    {
+      if (Simulator::Now () > start)
+        {
+          Time delay = Simulator::Now () - it->second;
+          m_received++;
+          m_received_bytes += pkt->GetSize ();
+          m_delaySum += delay;
+          m_jitterSum += ( (m_lastDelay > delay) ? (m_lastDelay - delay) : (delay - m_lastDelay) );
+          m_lastDelay = delay;
+        }
+      m_sentFrames.erase (it);
+    }
+}
+
+
+
+/* ================= Main ================ */
+
 int main (int argc, char *argv[])
 {
-  float simTime = 1.5;
-  float calcStart = 1;
-  uint32_t seed = 1;
+  float calcStart = 5;
+  float simTime = 25;
+  uint32_t seed = 3;
 
-  float x1 = 700.0;
-  float x2 = 350.0;
-  float y2 = 550.0;
-  float x3 = 350.0;
-  float y3 = -550.0;
-  double noise = -120.0;
-  double CsPowerThr = -130;
+  float xD = 680.0;
+  float yD = 0.0;
+
+  double snr = 0;
+
+  double noise = -100.0;
+  double CsPowerThr = -110;
+  double RxPowerThr = -108;
   double TxPower = 20;
-  double PerThr = 0.5;
+  double BerThr = 0.5;
+  bool useLOTF = true;
+  bool useBB2 = false;
 
-  uint32_t cwMin = 8;
+  uint32_t cwMin = 16;
   uint32_t cwMax = 1024;
   double slotTime = 15;
   double sifsTime = 30;
   double lifsTime = 60;
-  uint32_t basicPhyRate = 6;
-  uint32_t dataPhyRate = 18;
   uint32_t queueLimit = 20;
   uint16_t retryLimit = 2;
   double ackTimeout = 3500;
 
-  float Mbps = 1;
+  uint32_t basicPhyRate = 6;
+  uint32_t dataPhyRate = 6;
+
+  float Mbps = 15;
   uint16_t packetSize = 1000;
-  uint32_t packetLimit = 1;
+  uint32_t packetLimit = 0;
 
 
 
 /* =============== Logging =============== */
 
-  LogComponentEnable("RescueMacCsma", LOG_LEVEL_INFO); //comment to switch off logging
+  //LogComponentEnable("RescueMacCsma", LOG_LEVEL_INFO); //comment to switch off logging
   //LogComponentEnable("RescueMacCsma", LOG_LEVEL_DEBUG); //comment to switch off logging
   //LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
 
-  LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
+  //LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
   //LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
   //LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
 
-  LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
-  LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
-  LogComponentEnable("ConstantRateRescueManager", LOG_LEVEL_ALL); //comment to switch off logging
-  LogComponentEnable("RescueHelper", LOG_LEVEL_ALL); //comment to switch off logging
-  LogComponentEnable("BlackBox", LOG_LEVEL_ALL); //comment to switch off logging
+  //LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
+  //LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
+  //LogComponentEnable("ConstantRateRescueManager", LOG_LEVEL_ALL); //comment to switch off logging
+  //LogComponentEnable("RescueHelper", LOG_LEVEL_ALL); //comment to switch off logging
+  //LogComponentEnable("BlackBox_no1", LOG_LEVEL_ALL); //comment to switch off logging
   
 
 
@@ -206,71 +254,50 @@ int main (int argc, char *argv[])
   CommandLine cmd;
   cmd.AddValue ("simTime", "Time of simulation", simTime);
   cmd.AddValue ("calcStart", "Begin of results analysis", calcStart);
-  cmd.AddValue("seed", "Seed", seed);
+  cmd.AddValue ("seed", "Seed", seed);
 
-  cmd.AddValue ("x1", "Distance [m] between nodes 0 (sender; [x0,y0]=[0,0]) and 1 (X-coordinate of node 1)", x1);
-  cmd.AddValue ("x2", "X-coordinate [m] of node 2 (relay)", x2);
-  cmd.AddValue ("y2", "Y-coordinate [m] of node 2 (relay)", y2);
-  cmd.AddValue ("x3", "X-coordinate [m] of node 3 (relay)", x3);
-  cmd.AddValue ("y3", "Y-coordinate [m] of node 3 (relay)", y3);
+  cmd.AddValue ("xD", "X-coordinate [m] of node 1 (destination)", xD);
+  cmd.AddValue ("yD", "Y-coordinate [m] of node 2 (destination)", yD);
+
+  cmd.AddValue ("snr", "SNR [dB] for direct transmission between node 0 (source) and node 1 (receiver)", snr);
+
   cmd.AddValue ("noise", "Noise floor for channel [dBm]", noise);
   cmd.AddValue ("CsPowerThr", "Carrier Sense Threshold [dBm]", CsPowerThr);
+  cmd.AddValue ("RxPowerThr", "Reception Power Threshold [dBm]", RxPowerThr);
   cmd.AddValue ("TxPower", "Transmission Power [dBm]", TxPower);
-  cmd.AddValue ("PerThr", "PER threshold - frames with higher PER are unusable for reconstruction purposes and should not be stored or forwarded (default value = 0.5)", PerThr);
+  cmd.AddValue ("BerThr", "BER threshold - frames with higher BER are unusable for reconstruction purposes and should not be stored or forwarded (default value = 0.5)", BerThr);
+  cmd.AddValue ("useLOTF", "Use Links-on-the-Fly", useLOTF);
+  cmd.AddValue ("useBB2", "Use BlackBox #2 for error calculations", useBB2);
 
   cmd.AddValue ("cwMin", "Minimum value of CW", cwMin);
   cmd.AddValue ("cwMax", "Maximum value of CW", cwMax);
   cmd.AddValue ("slotTime", "Time slot duration [us] for MAC backoff", slotTime);
   cmd.AddValue ("sifsTime", "Short Inter-frame Space [us]", sifsTime);
   cmd.AddValue ("lifsTime", "Long Inter-frame Space [us]", lifsTime);
-  cmd.AddValue ("basicPhyRate", "Transmission Rate [Mbps] for Control Packets", basicPhyRate);
-  cmd.AddValue ("dataPhyRate", "Transmission Rate [Mbps] for Data Packets", dataPhyRate);
   cmd.AddValue ("queueLimit", "Maximum packets to queue at MAC", queueLimit);
   cmd.AddValue ("retryLimit", "Maximum Limit for DATA Retransmission", retryLimit);
   cmd.AddValue ("ackTimeout", "ACK awaiting time [us]", ackTimeout);
+
+  cmd.AddValue ("basicPhyRate", "Transmission Rate [Mbps] for Control Packets", basicPhyRate);
+  cmd.AddValue ("dataPhyRate", "Transmission Rate [Mbps] for Data Packets", dataPhyRate);
 
   cmd.AddValue ("dataRate", "Data Rate [Mbps]", Mbps);
   cmd.AddValue ("packetSize", "Packet Size [B]", packetSize);
   cmd.AddValue ("packetLimit", "Max number of transmitted packets (0 - no limit)", packetLimit);
   cmd.Parse (argc, argv);
-
-
-  ns3::RngSeedManager::SetSeed (seed);
   
 
-
-/* ===== Channel / Propagation Model ===== */
-
-  Ptr<RescueChannel> rescueChan = CreateObject<RescueChannel> ();
-  rescueChan->SetAttribute ("NoiseFloor", DoubleValue (noise)); 
+  ns3::RngSeedManager::SetSeed (seed);
+  end = Seconds (simTime);
+  start = Seconds (calcStart);
 
 
 
 /* ============ Nodes creation =========== */  
 
   NodeContainer nodes;
-  nodes.Create (4);
-  RescuePhyBasicHelper rescuePhy = RescuePhyBasicHelper::Default ();
-  rescuePhy.SetType ("ns3::RescuePhy",
-                     "CsPowerThr", DoubleValue (CsPowerThr),
-                     "TxPower", DoubleValue (TxPower),
-                     "PerThr", DoubleValue (PerThr));
-  RescueMacCsmaHelper rescueMac = RescueMacCsmaHelper::Default ();
-  rescueMac.SetType ("ns3::RescueMacCsma",
-                     "CwMin", UintegerValue (cwMin),
-                     "CwMax", UintegerValue (cwMax),
-                     "SlotTime", TimeValue (MicroSeconds (slotTime)),
-                     "SifsTime", TimeValue (MicroSeconds (sifsTime)),
-                     "LifsTime", TimeValue (MicroSeconds (lifsTime)),
-                     "QueueLimit", UintegerValue (queueLimit),
-                     "AckTimeout", TimeValue (MicroSeconds (ackTimeout)));
-  RescueHelper rescue;
-  rescue.SetRemoteStationManager ("ns3::ConstantRateRescueManager",
-							      "DataMode", StringValue (SimulationHelper::MapPhyRateToString (dataPhyRate)),
-							      "ControlMode", StringValue (SimulationHelper::MapPhyRateToString (basicPhyRate)),
-								  "MaxSrc", UintegerValue (retryLimit));
-  NetDeviceContainer devices = rescue.Install (nodes, rescueChan, rescuePhy, rescueMac);
-  
+  nodes.Create (2);
+
 
 
 /* ======== Positioning / Mobility ======= */
@@ -278,12 +305,51 @@ int main (int argc, char *argv[])
   MobilityHelper mobility;
   Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
   positionAlloc->Add (Vector (0.0, 0.0, 0.0));
-  positionAlloc->Add (Vector (x1, 0.0, 0.0));
-  positionAlloc->Add (Vector (x2, y2, 0.0));
-  positionAlloc->Add (Vector (x3, y3, 0.0));
+  positionAlloc->Add (Vector (xD, yD, 0.0));
   mobility.SetPositionAllocator (positionAlloc);
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (nodes);
+
+
+
+/* ===== Channel / Propagation Model ===== */
+
+  Ptr<MatrixPropagationLossModel> lossModel = CreateObject<MatrixPropagationLossModel> ();
+  lossModel->SetLoss (nodes.Get(0)->GetObject<MobilityModel>(), nodes.Get(1)->GetObject<MobilityModel>(), TxPower - noise - snr); //Loss = TxPower - noise - snr
+
+  Ptr<RescueChannel> rescueChan = CreateObject<RescueChannel> ();
+  rescueChan->SetAttribute ("NoiseFloor", DoubleValue (noise)); 
+  rescueChan->SetAttribute ("PropagationLossModel", PointerValue (lossModel));
+
+
+
+/* ======= PHY & MAC configuration ======= */  
+
+  RescuePhyBasicHelper rescuePhy = RescuePhyBasicHelper::Default ();
+  rescuePhy.SetType ("ns3::RescuePhy",
+                     "CsPowerThr", DoubleValue (CsPowerThr),
+                     "RxPowerThr", DoubleValue (RxPowerThr),
+                     "TxPower", DoubleValue (TxPower),
+                     "BerThr", DoubleValue (BerThr),
+                     "UseLOTF", BooleanValue (useLOTF),
+                     "UseBB2", BooleanValue (useBB2));
+
+  AdhocRescueMacHelper rescueMac = AdhocRescueMacHelper::Default ();
+  rescueMac.SetType ("ns3::AdhocRescueMac",
+                     "CwMin", UintegerValue (cwMin),
+                     "CwMax", UintegerValue (cwMax),
+                     "SlotTime", TimeValue (MicroSeconds (slotTime)),
+                     "SifsTime", TimeValue (MicroSeconds (sifsTime)),
+                     "LifsTime", TimeValue (MicroSeconds (lifsTime)),
+                     "QueueLimits", UintegerValue (queueLimit),
+                     "BasicAckTimeout", TimeValue (MicroSeconds (ackTimeout)));
+
+  RescueHelper rescue;
+  rescue.SetRemoteStationManager ("ns3::ConstantRateRescueManager",
+							      "DataMode", StringValue (SimulationHelper::MapPhyRateToString (dataPhyRate)),
+							      "ControlMode", StringValue (SimulationHelper::MapPhyRateToString (basicPhyRate)),
+								  "MaxSrc", UintegerValue (++retryLimit));
+  NetDeviceContainer devices = rescue.Install (nodes, rescueChan, rescuePhy, rescueMac);
   
 
 
@@ -300,15 +366,14 @@ int main (int argc, char *argv[])
 
 /* ============= Applications ============ */
 
-  uint16_t dataSize = packetSize - (8 + 20 + 8);
+  uint16_t dataSize = packetSize - (8 + 20 + 8 + 15 + 4); //UDP hdr, IP hdr, LLC hdr, MAC hdr, MAC FCS
   DataRate dataRate = DataRate (int(1000000 * Mbps * dataSize/packetSize));
 
   OnOffHelper onOffHelper ("ns3::UdpSocketFactory", InetSocketAddress (iface.GetAddress (1), 1000));
   onOffHelper.SetConstantRate (dataRate, dataSize);
   onOffHelper.SetAttribute ("MaxBytes", UintegerValue (packetLimit*dataSize));
-  //onOffHelper.SetAttribute ("UserPriority", UintegerValue (up));
   onOffHelper.SetAttribute ("StartTime", TimeValue (Seconds (1.0)));
-  onOffHelper.SetAttribute ("StopTime", TimeValue (Seconds (simTime)));
+  onOffHelper.SetAttribute ("StopTime", TimeValue (end));
   //onOffHelper.SetAttribute ("RandSendTimeLimit", UintegerValue (random)); //packets generation times modified by random value between -50% and + 50% of constant time step between packets
   onOffHelper.Install (nodes.Get (0));
 
@@ -333,21 +398,28 @@ int main (int argc, char *argv[])
 
 
 
+/* =========== Trace Connections ========= */
+
+  Config::Connect ("/NodeList/*/DeviceList/*/Mac/EnqueueOk", MakeCallback (&EnqueueOkTrace));
+  Config::Connect ("/NodeList/*/DeviceList/*/Mac/DataRxOk", MakeCallback (&DataRxOkTrace));
+
+
+
 /* ============= Flow Monitor ============ */
 
-  FlowMonitorHelper flowmon_helper;
+  /*FlowMonitorHelper flowmon_helper;
   Ptr<FlowMonitor> monitor = flowmon_helper.InstallAll ();
   monitor->SetAttribute ("StartTime", TimeValue (Seconds (calcStart))); //czas od którego będa zbierane statystyki
   monitor->SetAttribute ("DelayBinWidth", DoubleValue (0.001));
   monitor->SetAttribute ("JitterBinWidth", DoubleValue (0.001));
-  monitor->SetAttribute ("PacketSizeBinWidth", DoubleValue (20));
+  monitor->SetAttribute ("PacketSizeBinWidth", DoubleValue (20));*/
 
-  
+
 
 /* ========== Running simulation ========= */
 
   SimulationHelper::PopulateArpCache ();
-  Simulator::Stop (Seconds (simTime));
+  Simulator::Stop (end);
   Simulator::Run ();
   Simulator::Destroy ();
 
@@ -355,11 +427,11 @@ int main (int argc, char *argv[])
 
 /* =========== Printing Results ========== */
 
-  monitor->CheckForLostPackets();
+  /*monitor->CheckForLostPackets();
   Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon_helper.GetClassifier ());
   std::string proto;
   
-  std::cout << std::endl;
+  //std::cout << std::endl;
   
   std::map< FlowId, FlowMonitor::FlowStats > stats = monitor->GetFlowStats();
   for (std::map< FlowId, FlowMonitor::FlowStats >::iterator flow = stats.begin (); flow != stats.end (); flow++)
@@ -387,7 +459,30 @@ int main (int argc, char *argv[])
       std::cout << "  Tx Packets: " << flow->second.txPackets << std::endl;
       std::cout << "  Rx Packets: " << flow->second.rxPackets << std::endl;
       std::cout << "  Lost Packets: " << flow->second.lostPackets << std::endl;
-    }
+      std::cout << "  Mean Delay: " << flow->second.delaySum / m_received << std::endl;
+      std::cout << "  Mean Delay: " << flow->second.jitterSum / m_received << std::endl;
+
+      std::cout << "  Throughput [Mbps]: " << 8000 * (double)flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds () << std::endl;*/
+
+      //std::cout << "snr [dBm]:\tthr [Mbps]:\tloss [%]:\tdel [ms]:\tjitter [ms]:" << std::endl;
+      //std::cout << snr << "\t" << 8000 * (double)flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds () << std::endl;
+    //}
+
+      //std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
+      //std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;
+      //std::cout << "  Tx Packets: " << m_send << std::endl;
+      //std::cout << "  Rx Packets: " << m_received << std::endl;
+      //std::cout << "  Throughput [Mbps]: " << 8 * (double)m_received_bytes / (double)(simTime - calcStart) / 1000000 << std::endl;
+      //std::cout << "  Lost Packets [%]: " <<  ((m_send > m_received) ? (100 * ((double)m_send - (double)m_received) / (double)m_send) : 0) << std::endl;
+      //std::cout << "  Mean Delay [ms]: " << (double)(m_delaySum / m_received).GetMicroSeconds () / 1000 << std::endl;
+      //std::cout << "  Mean Jitter [ms]: " << (double)(m_jitterSum / m_received).GetMicroSeconds () / 1000 << std::endl;
+
+      //std::cout << "snr [dBm]:\tthr [Mbps]:\tloss [%]:\tdel [ms]:\tjitter [ms]:" << std::endl;
+      std::cout << snr << "\t" 
+                << 8 * (double)m_received_bytes / (double)(simTime - calcStart) / 1000000 << "\t"
+                << ((m_send > m_received) ? (100 * ((double)m_send - (double)m_received) / (double)m_send) : 0) << "\t"
+                << (double)(m_delaySum / m_received).GetMicroSeconds () / 1000 << "\t"
+                << (double)(m_jitterSum / m_received).GetMicroSeconds () / 1000 << std::endl;
 
   return 0;
 }
