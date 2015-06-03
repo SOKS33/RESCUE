@@ -1,6 +1,7 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2010 University of Arizona
+ * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -47,7 +48,7 @@ public:
   
   void Set (std::string n = "", const AttributeValue &v = EmptyAttributeValue ());
   
-  void SetErrorRateModel (std::string name,
+  /*void SetErrorRateModel (std::string name,
                           std::string n0 = "", const AttributeValue &v0 = EmptyAttributeValue (),
                           std::string n1 = "", const AttributeValue &v1 = EmptyAttributeValue (),
                           std::string n2 = "", const AttributeValue &v2 = EmptyAttributeValue (),
@@ -55,13 +56,13 @@ public:
                           std::string n4 = "", const AttributeValue &v4 = EmptyAttributeValue (),
                           std::string n5 = "", const AttributeValue &v5 = EmptyAttributeValue (),
                           std::string n6 = "", const AttributeValue &v6 = EmptyAttributeValue (),
-                          std::string n7 = "", const AttributeValue &v7 = EmptyAttributeValue ());
+                          std::string n7 = "", const AttributeValue &v7 = EmptyAttributeValue ());*/
 
 private:
   virtual Ptr<RescuePhy> Create (void) const;
 
   ObjectFactory m_phy;
-  ObjectFactory m_errorRateModel;
+  //ObjectFactory m_errorRateModel;
 };
 
 } //namespace ns3

@@ -1,6 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006,2007 INRIA
+ * Copyright (c) 2015 AGH University of Science nad Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,6 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ *
+ * Adapted for Rescue by: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  */
 
 #include "rescue-remote-station-manager.h"
@@ -28,6 +31,7 @@
 #include "ns3/uinteger.h"
 #include "ns3/trace-source-accessor.h"
 #include "rescue-phy.h"
+#include "rescue-mac.h"
 #include "rescue-mac-header.h"
 
 NS_LOG_COMPONENT_DEFINE ("RescueRemoteStationManager");
@@ -44,10 +48,13 @@ class HighLatencyDataTxModeTag : public Tag
 public:
   HighLatencyDataTxModeTag ();
   HighLatencyDataTxModeTag (RescueMode dataTxMode);
+  HighLatencyDataTxModeTag (uint32_t dataCw);
+  HighLatencyDataTxModeTag (RescueMode dataTxMode, uint32_t dataCw);
   /**
    * \returns the transmission mode to use to send this packet
    */
   RescueMode GetDataTxMode (void) const;
+  uint32_t GetDataCw (void) const;
 
   static TypeId GetTypeId (void);
   virtual TypeId GetInstanceTypeId (void) const;
@@ -57,6 +64,7 @@ public:
   virtual void Print (std::ostream &os) const;
 private:
   RescueMode m_dataTxMode;
+  uint16_t m_dataCw;
 };
 
 HighLatencyDataTxModeTag::HighLatencyDataTxModeTag ()
@@ -66,11 +74,25 @@ HighLatencyDataTxModeTag::HighLatencyDataTxModeTag (RescueMode dataTxMode)
   : m_dataTxMode (dataTxMode)
 {
 }
+HighLatencyDataTxModeTag::HighLatencyDataTxModeTag (uint32_t dataCw)
+  : m_dataCw (dataCw)
+{
+}
+HighLatencyDataTxModeTag::HighLatencyDataTxModeTag (RescueMode dataTxMode, uint32_t dataCw)
+  : m_dataTxMode (dataTxMode),
+    m_dataCw (dataCw)
+{
+}
 
 RescueMode 
 HighLatencyDataTxModeTag::GetDataTxMode (void) const
 {
   return m_dataTxMode;
+}
+uint32_t 
+HighLatencyDataTxModeTag::GetDataCw (void) const
+{
+  return m_dataCw;
 }
 TypeId
 HighLatencyDataTxModeTag::GetTypeId (void)
@@ -95,16 +117,18 @@ void
 HighLatencyDataTxModeTag::Serialize (TagBuffer i) const
 {
   i.Write ((uint8_t *)&m_dataTxMode, sizeof (RescueMode));
+  i.WriteU16 (m_dataCw);
 }
 void
 HighLatencyDataTxModeTag::Deserialize (TagBuffer i)
 {
   i.Read ((uint8_t *)&m_dataTxMode, sizeof (RescueMode));
+  m_dataCw = i.ReadU16 ();
 }
 void
 HighLatencyDataTxModeTag::Print (std::ostream &os) const
 {
-  os << "Data=" << m_dataTxMode;
+  os << "Data=" << m_dataTxMode << " cw=" << m_dataCw;
 }
 
 } // namespace ns3
@@ -178,6 +202,33 @@ RescueRemoteStationManager::SetupPhy (Ptr<RescuePhy> phy)
   m_defaultTxMode = phy->GetMode (0);
   Reset ();
 }
+void
+RescueRemoteStationManager::SetupMac (Ptr<RescueMac> mac)
+{
+  m_mac = mac;
+}
+
+void
+RescueRemoteStationManager::SetCwMin (uint32_t cw)
+{
+  m_cwMin = cw;
+}
+void
+RescueRemoteStationManager::SetCwMax (uint32_t cw)
+{
+  m_cwMax = cw;
+}
+
+uint32_t
+RescueRemoteStationManager::GetCwMin (void)
+{
+  return m_cwMin;
+}
+uint32_t
+RescueRemoteStationManager::GetCwMax (void)
+{
+  return m_cwMax;
+}
 
 uint32_t
 RescueRemoteStationManager::GetMaxSrc (void) const
@@ -188,6 +239,12 @@ void
 RescueRemoteStationManager::SetMaxSrc (uint32_t maxSrc)
 {
   m_maxSrc = maxSrc;
+}
+
+Mac48Address
+RescueRemoteStationManager::GetAddress () const
+{
+  return m_mac->GetAddress ();
 }
 
 void
@@ -274,7 +331,7 @@ RescueRemoteStationManager::PrepareForQueue (Mac48Address address, Ptr<const Pac
       return;
     }
   RescueRemoteStation *station = Lookup (address);
-  RescueMode data = DoGetDataTxMode (station, fullPacketSize); 
+  RescueMode data = DoGetDataTxMode (station, packet, fullPacketSize); 
   HighLatencyDataTxModeTag datatag;
   // first, make sure that the tag is not here anymore.
   ConstCast<Packet> (packet)->RemovePacketTag (datatag);
@@ -301,7 +358,28 @@ RescueRemoteStationManager::GetDataTxMode (Mac48Address address, Ptr<const Packe
       (void) found;
       return datatag.GetDataTxMode ();
     }
-  return DoGetDataTxMode (Lookup (address), fullPacketSize);
+  return DoGetDataTxMode (Lookup (address), packet, fullPacketSize);
+}
+uint32_t
+RescueRemoteStationManager::GetDataCw (Mac48Address address, Ptr<const Packet> packet, uint32_t fullPacketSize)
+{
+  if (address.IsGroup ())
+    {
+      NS_LOG_DEBUG ("Group adress");
+      return GetNonUnicastCw ();
+    }
+  if (!IsLowLatency ())
+    {
+      HighLatencyDataTxModeTag datatag;
+      bool found;
+      found = ConstCast<Packet> (packet)->PeekPacketTag (datatag);
+      NS_ASSERT (found);
+      // cast found to void, to suppress 'found' set but not used
+      // compiler warning
+      (void) found;
+      return datatag.GetDataCw ();
+    }
+  return DoGetDataCw (Lookup (address), packet, fullPacketSize);
 }
 
 void
@@ -333,14 +411,30 @@ RescueRemoteStationManager::ReportFinalDataFailed (Mac48Address address)
   DoReportFinalDataFailed (station);
 }
 void
-RescueRemoteStationManager::ReportRxOk (Mac48Address address, double rxSnr, RescueMode txMode)
+RescueRemoteStationManager::ReportRxOk (Mac48Address senderAddress, Mac48Address sourceAddress, 
+                                        double rxSnr, RescueMode txMode, bool wasReconstructed)
 {
-  if (address.IsGroup ())
+  /*if (address.IsGroup ())
     {
       return;
-    }
-  RescueRemoteStation *station = Lookup (address);
-  DoReportRxOk (station, rxSnr, txMode);
+    }*/
+  RescueRemoteStation *senderStation = Lookup (senderAddress);
+  RescueRemoteStation *sourceStation = Lookup (sourceAddress);
+  DoReportRxOk (senderStation, sourceStation, 
+                rxSnr, txMode, wasReconstructed);
+}
+void
+RescueRemoteStationManager::ReportRxFail (Mac48Address senderAddress, Mac48Address sourceAddress, 
+                                          double rxSnr, RescueMode txMode, bool wasReconstructed)
+{
+  /*if (address.IsGroup ())
+    {
+      return;
+    }*/
+  RescueRemoteStation *senderStation = Lookup (senderAddress);
+  RescueRemoteStation *sourceStation = Lookup (sourceAddress);
+  DoReportRxFail (senderStation, sourceStation, 
+                  rxSnr, txMode, wasReconstructed);
 }
 bool
 RescueRemoteStationManager::NeedDataRetransmission (Mac48Address address, Ptr<const Packet> packet)
@@ -354,6 +448,7 @@ RescueRemoteStationManager::NeedDataRetransmission (Mac48Address address, Ptr<co
 RescueMode
 RescueRemoteStationManager::GetControlAnswerMode (Mac48Address address, RescueMode reqMode)
 {
+  NS_LOG_FUNCTION (this << address);
 
   if (&RescueRemoteStationManager::DoGetAckTxMode != 0)
     {
@@ -462,16 +557,58 @@ RescueRemoteStationManager::GetControlAnswerMode (Mac48Address address, RescueMo
 }
 
 RescueMode
+RescueRemoteStationManager::GetControlAnswerMode (Mac48Address address)
+{
+  NS_LOG_FUNCTION (this << address);
+
+  if (&RescueRemoteStationManager::DoGetAckTxMode_ != 0)
+    {
+      RescueRemoteStation *station = Lookup (address);
+      return DoGetAckTxMode_ (station);
+    }
+
+  return GetDefaultMode ();
+}
+
+uint32_t
+RescueRemoteStationManager::GetControlCw (Mac48Address address)
+{
+  return GetCwMin ();
+}
+
+RescueMode
 RescueRemoteStationManager::GetAckTxMode (Mac48Address address, RescueMode dataMode)
 {
   NS_ASSERT (!address.IsGroup ());
   return GetControlAnswerMode (address, dataMode);
 }
+
 RescueMode
-RescueRemoteStationManager::GetBlockAckTxMode (Mac48Address address, RescueMode blockAckReqMode)
+RescueRemoteStationManager::GetAckTxMode (Mac48Address address)
 {
   NS_ASSERT (!address.IsGroup ());
-  return GetControlAnswerMode (address, blockAckReqMode);
+  return GetControlAnswerMode (address);
+}
+
+uint32_t
+RescueRemoteStationManager::GetAckCw (Mac48Address address)
+{
+  NS_ASSERT (!address.IsGroup ());
+  return GetControlCw (address);
+}
+
+RescueMode
+RescueRemoteStationManager::GetCtrlTxMode (Mac48Address address)
+{
+  //NS_ASSERT (!address.IsGroup ());
+  return GetControlAnswerMode (address);
+}
+
+uint32_t
+RescueRemoteStationManager::GetCtrlCw (Mac48Address address)
+{
+  //NS_ASSERT (!address.IsGroup ());
+  return GetControlCw (address);
 }
 
 RescueRemoteStationInfo
@@ -573,6 +710,19 @@ RescueRemoteStationManager::GetNonUnicastMode (void) const
     }
 }
 
+uint32_t
+RescueRemoteStationManager::GetNonUnicastCw (void) const
+{
+  if (m_cwNonUnicast == 0)
+    {
+      return m_cwMin;
+    }
+  else
+    {
+      return m_cwNonUnicast;
+    }
+}
+
 bool
 RescueRemoteStationManager::DoNeedDataRetransmission (RescueRemoteStation *station,
                                                     Ptr<const Packet> packet, bool normally)
@@ -628,6 +778,15 @@ RescueRemoteStationInfo::NotifyTxSuccess (uint32_t retryCounter)
 {
   double coefficient = CalculateAveragingCoefficient ();
   m_failAvg = (double)retryCounter / (1 + (double) retryCounter) * (1.0 - coefficient) + coefficient * m_failAvg;
+}
+
+void
+RescueRemoteStationInfo::NotifyTxSuccessSNR (uint32_t retryCounter, double snr)
+{
+  double coefficient = CalculateAveragingCoefficient ();
+  m_failAvg = (double)retryCounter / (1 + (double) retryCounter) * (1.0 - coefficient) + coefficient * m_failAvg;
+
+  m_snrAvg = snr / (1 + snr) * (1.0 - coefficient) + coefficient * m_snrAvg; //?
 }
 
 void

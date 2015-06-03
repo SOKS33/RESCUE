@@ -32,7 +32,7 @@
 #include "ns3/applications-module.h"
 
 #include "ns3/rescue-channel.h"
-#include "ns3/rescue-mac-csma-helper.h"
+#include "ns3/rescue-helper.h"
 #include "ns3/rescue-phy-basic-helper.h"
 #include <vector>
 

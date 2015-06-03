@@ -29,9 +29,9 @@
 #include "ns3/ipv4-l3-protocol.h"
 #include "ns3/nstime.h"
 #include "ns3/ptr.h"
-#include "rescue-net-device.h"
-#include "rescue-phy.h"
-#include "rescue-channel.h"
+#include "ns3/random-variable-stream.h"
+
+#include "rescue-mac-header.h"
 #include "rescue-phy-header.h"
 #include "rescue-mode.h"
 
@@ -39,55 +39,146 @@ namespace ns3 {
 
 class RescuePhy;
 class RescueChannel;
+class LowRescueMac;
+class RescueMacCsma;
+class RescueMacTdma;
+class RescueRemoteStationManager;
 class RescueNetDevice;
 
+enum StationType
+{
+  STA,
+  AP,
+  ADHOC_STA
+};
+
 /**
- * \brief base class for all MAC-level rescue objects.
+ * \brief base class for all MAC-high-level rescue objects.
  * \ingroup rescue
- *
- * Currently this class encapsulates only RescueMacCsma
- *
  */
 class RescueMac : public Object
 {
 public:
+  RescueMac ();
+  virtual ~RescueMac ();
+  static TypeId GetTypeId (void);
+
+  /**
+   * Clear the transmission queues and pending packets, reset counters.
+   */
+  virtual void Clear (void);
+
   /**
    * \param phy the physical layer to attach to this MAC.
    */
-  virtual void AttachPhy (Ptr<RescuePhy> phy) = 0;
+  void AttachPhy (Ptr<RescuePhy> phy);
   /**
    * \param dev the device this MAC is attached to.
    */
-  virtual void SetDevice (Ptr<RescueNetDevice> dev) = 0;
+  void SetDevice (Ptr<RescueNetDevice> dev);
   /**
    * \param manager RescueRemoteStationManager associated with this MAC
    */
-  virtual void SetRemoteStationManager (Ptr<RescueRemoteStationManager> manager) = 0;
+  void SetRemoteStationManager (Ptr<RescueRemoteStationManager> manager);
+  /**
+   * Assign a fixed random variable stream number to the random variables
+   * used by this model.  Return the number of streams (possibly zero) that
+   * have been assigned.
+   *
+   * \param stream first stream index to use
+   * \return the number of stream indices assigned by this model
+   */
+  int64_t AssignStreams (int64_t stream);
+  /**
+   * \param upCallback the callback to invoke when a packet must be forwarded up the stack.
+   */
+  void SetForwardUpCb (Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb);
+
   /**
    * \param address the current address of this MAC layer.
    */
-  virtual void SetAddress (Mac48Address addr) = 0;
+  void SetAddress (Mac48Address addr);
   /**
-   * \param cw the minimum congestion window
+   * This method is invoked by a subclass to specify what type of
+   * station it is implementing. 
+   *
+   * \param type the type of station.
+   */
+  void SetTypeOfStation (StationType type);
+  /**
+   * \param cw the minimum contetion window
    */ 
-  virtual void SetCwMin (uint32_t cw) = 0;
+  void SetCwMin (uint32_t cw);
+  /**
+   * \param cw the maximal contetion window
+   */ 
+  void SetCwMax (uint32_t cw);
+  /**
+   * \param duration the slot duration
+   */
+  void SetSlot (Time duration);
+  /**
+   * \param duration the SIFS duration
+   */
+  void SetSifs (Time duration);
+  /**
+   * \param duration the LIFS duration
+   */
+  void SetLifs (Time duration);
+  /**
+   * \param length the length of queues used by this MAC
+   */
+  void SetQueueLimits (uint32_t length);
+  /**
+   * \param duration the Basic ACK Timeout duration
+   */
+  void SetBasicAckTimeout (Time duration);
+
   /**
    * \return the current address of this MAC layer.
    */
-  virtual Mac48Address GetAddress (void) const = 0;
+  Mac48Address GetAddress (void) const;
   /**
    * \return broadcast address
    */
-  virtual Mac48Address GetBroadcast (void) const = 0;
- /**
-  * Assign a fixed random variable stream number to the random variables
-  * used by this model.  Return the number of streams (possibly zero) that
-  * have been assigned.
-  *
-  * \param stream first stream index to use
-  * \return the number of stream indices assigned by this model
-  */
-  virtual int64_t AssignStreams (int64_t stream) = 0;
+  Mac48Address GetBroadcast (void) const;
+  /**
+   * \return pointer to CsmaMac object
+   */
+  Ptr<RescueMacCsma> GetCsmaMac (void) const;
+  /**
+   * \return pointer to CsmaMac object
+   */
+  Ptr<RescueMacTdma> GetTdmaMac (void) const;
+
+  /**
+   * \return minimal contention window
+   */ 
+  uint32_t GetCwMin (void) const;
+  /**
+   * \return maximal contention window
+   */ 
+  uint32_t GetCwMax (void) const;
+  /**
+   * \return the current slot duration.
+   */
+  Time GetSlot (void) const;
+  /**
+   * \return the current SIFS duration.
+   */
+  Time GetSifs (void) const;
+  /**
+   * \return the current LIFS duration.
+   */
+  Time GetLifs (void) const;
+  /**
+   * \return length the length of queues used by this MAC
+   */
+  uint32_t GetQueueLimits (void) const;
+  /**
+   * \return duration the Basic ACK Timeout duration
+   */
+  Time GetBasicAckTimeout (void) const;
 
   /**
    * \param pkt the packet to send.
@@ -97,45 +188,76 @@ public:
    * dequeued as soon as the CSMA determines that
    * access is granted to this MAC.
    */
-  virtual bool Enqueue (Ptr<Packet> pkt, Mac48Address dest) = 0;
+  virtual void Enqueue (Ptr<Packet> pkt, Mac48Address dest);
   
   /**
-   * This method is called after end of packet transmission
+   * invoked to notify about successful DATA frame enqueing
    *
-   * \param pkt transmitted packet
+   * \param pkt the received DATA frame
+   * \param phyHdr MAC header associated with the received DATA frame
    */
-  virtual void SendPacketDone (Ptr<Packet> packet) = 0;
+  void EnqueueOk (Ptr<const Packet> pkt, const RescueMacHeader &hdr);
+
   /**
-   * Method used by PHY to notify MAC about begin of frame reception
+   * invoked by ReceivePacketDone to process DATA frames
    *
-   * \param phy receiving phy
-   * \param pkt the received packet
+   * \param pkt the received DATA frame
+   * \param phyHdr PHY header associated with the received DATA frame
    */
-  virtual void ReceivePacket (Ptr<RescuePhy> phy, Ptr<Packet> packet) = 0;
+  virtual void ReceivePacket (Ptr<Packet> pkt, RescuePhyHeader phyHdr);  
+
   /**
-   * Method used by PHY to notify MAC about end of frame reception
+   * invoked to notify about new DATA frame received
    *
-   * \param phy receiving phy
+   * \param pkt the received DATA frame
+   * \param phyHdr PHY header associated with the received DATA frame
+   */
+  void RxOk (Ptr<const Packet> pkt, const RescuePhyHeader &hdr); 
+
+  /**
+   * invoked by ReceivePacketDone to process RESOURCE RESERVATION frame
+   * currently NOT SUPPORTED
+   *
+   * \param pkt the received RESOURCE RESERVATION frame
+   * \param phyHdr PHY header associated with the received RESOURCE RESERVATION frame
+   */
+  virtual void ReceiveResourceReservation (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+  /**
+   * invoked by ReceivePacketDone to process BEACON frame
+   * currently NOT SUPPORTED
+   *
+   * \param pkt the received BEACON frame
+   * \param phyHdr PHY header associated with the received BEACON frame
+   */
+  virtual void ReceiveBeacon (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+
+  /**
    * \param pkt the received packet
    * \param phyHdr PHY header associated with the received packet
-   * \param snr SNR of this transmission
-   * \param mode the mode (RescueMode) of this transmission
-   * \param correctPhyHdr true if the PHY header was correctly received
-   * \param correctData true if the payload was correctly received
-   * \param wasReconstructed true if the frame was reconstructed basing on almost two received frame copies
+   *
+   * \return true if the received frame is scheduled for forwarding
    */
-  virtual void ReceivePacketDone (Ptr<RescuePhy> phy, Ptr<Packet> pkt, RescuePhyHeader phyHdr, 
-                                  double snr, RescueMode mode, 
-                                  bool correctPhyHdr, bool correctData, bool wasReconstructed) = 0;
-  /**
-   * \param upCallback the callback to invoke when a packet must be forwarded up the stack.
-   */
-  virtual void SetForwardUpCb (Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb) = 0;
+  virtual bool ShouldBeForwarded (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
   
-  /**
-   * Clear the transmission queues and pending packets, reset counters.
-   */
-  virtual void Clear (void) = 0;
+protected:
+  virtual void DoInitialize ();
+  virtual void DoDispose ();
+      
+  Callback <void, Ptr<Packet>, Mac48Address, Mac48Address> m_forwardUpCb;   //!< The callback to invoke when a packet must be forwarded up the stack
+
+  Ptr<RescuePhy> m_phy;                                     //!< Pointer to RescuePhy (actually send/receives frames)
+  Ptr<RescueMacCsma> m_csmaMac;                             //!< Pointer to RescueMacCsma
+  Ptr<RescueMacTdma> m_tdmaMac;                             //!< Pointer to RescueMacTdma
+  Ptr<RescueNetDevice> m_device;                            //!< Pointer to RescueNetDevice
+  Ptr<RescueRemoteStationManager> m_remoteStationManager;   //!< Pointer to WifiRemoteStationManager (rate control)
+  Ptr<UniformRandomVariable> m_random;                      //!< Provides uniform random variables.
+      
+  Mac48Address m_address;   //!< Address of this MAC
+  StationType m_type;       //!< Type of this station
+  
+  // for trace and performance evaluation
+  TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescueMacHeader &> m_traceEnqueue;            //<! Trace Hookup for enqueue a DATA
+  TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescuePhyHeader &> m_traceDataRxOk;           //<! Trace Hookup for DATA RX (by final station)
 
 };
 

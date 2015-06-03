@@ -1,6 +1,7 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2010 University of Arizona
+ * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -38,7 +39,7 @@ RescuePhyBasicHelper::Default (void)
 {
   RescuePhyBasicHelper helper;
   helper.SetType ("ns3::RescuePhy");
-  helper.SetErrorRateModel ("ns3::RescueNistErrorRateModel");
+  //helper.SetErrorRateModel ("ns3::RescueNistErrorRateModel");
   return helper;
 }
 
@@ -70,7 +71,7 @@ RescuePhyBasicHelper::Set (std::string n, const AttributeValue &v)
   m_phy.Set (n, v);
 }
 
-void
+/*void
 RescuePhyBasicHelper::SetErrorRateModel (std::string name,
                                          std::string n0, const AttributeValue &v0,
                                          std::string n1, const AttributeValue &v1,
@@ -91,14 +92,14 @@ RescuePhyBasicHelper::SetErrorRateModel (std::string name,
   m_errorRateModel.Set (n5, v5);
   m_errorRateModel.Set (n6, v6);
   m_errorRateModel.Set (n7, v7);
-}
+}*/
 
 Ptr<RescuePhy>
 RescuePhyBasicHelper::Create (void) const
 {
   Ptr<RescuePhy> phy = m_phy.Create<RescuePhy> ();
-  Ptr<RescueErrorRateModel> error = m_errorRateModel.Create<RescueErrorRateModel> ();
-  phy->SetErrorRateModel (error);
+  //Ptr<RescueErrorRateModel> error = m_errorRateModel.Create<RescueErrorRateModel> ();
+  //phy->SetErrorRateModel (error);
   return phy;
 }
 

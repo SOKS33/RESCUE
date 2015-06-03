@@ -47,11 +47,12 @@ public:
   SnrPerTag ();
 
   /**
-   * Create a SnrPerTag with the given SNR and PER value
+   * Create a SnrPerTag with the given SNR, PER and BER value
    * \param snr the given SNR value
    * \param per the given PER value
+   * \param per the given BER value
    */
-  SnrPerTag (double snr, double per);
+  SnrPerTag (double snr, /*double per,*/ double ber);
 
   /**
    * Set the SNR to the given value.
@@ -64,7 +65,13 @@ public:
    *
    * \param per the value of the PER to set
    */
-  void SetPER (double per);
+  //void SetPER (double per);
+  /**
+   * Set the BER to the given value.
+   *
+   * \param per the value of the BER to set
+   */
+  void SetBER (double ber);
   /**
    * Return the SNR value.
    *
@@ -76,7 +83,13 @@ public:
    *
    * \return the PER value
    */
-  double GetPER (void) const;
+  //double GetPER (void) const;
+  /**
+   * Return the BER value.
+   *
+   * \return the BER value
+   */
+  double GetBER (void) const;
 
   // Inherrited methods
   virtual uint32_t GetSerializedSize (void) const;
@@ -86,7 +99,8 @@ public:
 
 private:
   double m_snr;  //!< SNR value
-  double m_per;  //!< PER value
+  //double m_per;  //!< PER value
+  double m_ber;  //!< BER value
 };
 
 

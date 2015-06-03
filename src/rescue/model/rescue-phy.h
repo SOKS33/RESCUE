@@ -18,6 +18,7 @@
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
  * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
+ * and ns-3 wifi module by Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
 #ifndef RESCUE_PHY_H
@@ -28,13 +29,20 @@
 #include "ns3/random-variable-stream.h"
 
 #include "rescue-mac.h"
+#include "low-rescue-mac.h"
+//#include "rescue-mac-csma.h"
+//#include "rescue-mac-tdma.h"
 #include "rescue-phy.h"
 #include "rescue-phy-header.h"
 #include "rescue-mode.h"
-#include "rescue-error-rate-model.h"
+//#include "rescue-error-rate-model.h"
 
 
 namespace ns3 {
+
+class LowRescueMac;
+class RescueMacCsma;
+//class RescueMacTdma;
 
 /**
  * \brief Rescue PHY layer model
@@ -60,9 +68,25 @@ public:
    */
   void SetDevice (Ptr<RescueNetDevice> device);
   /**
-   * \param mac the MAC this PHY is attached to.
+   * \param mac the (high) MAC this PHY is attached to.
    */
   void SetMac (Ptr<RescueMac> mac);
+  /**
+   * \param mac the (low) CSMA MAC this PHY is attached to.
+   */
+  void SetMacCsma (Ptr<RescueMacCsma> csmaMac);
+  /**
+   * \param mac the (low) TDMA MAC this PHY is attached to.
+   */
+  void SetMacTdma (Ptr<RescueMacTdma> tdmaMac);
+  /**
+   * Method used to notify PHY about Contention Free Period
+   */
+  void NotifyCFP ();
+  /**
+   * Method used to notify PHY about Contention Period
+   */
+  void NotifyCP ();
   /**
    * \param channel the channel used by this PHY
    */
@@ -74,7 +98,7 @@ public:
   /**
    * \param rate the error rate model
    */
-  void SetErrorRateModel (Ptr<RescueErrorRateModel> rate);
+  //void SetErrorRateModel (Ptr<RescueErrorRateModel> rate);
   
   /**
    * \return channel the channel used by this PHY
@@ -87,7 +111,7 @@ public:
   /**
    * \return the error rate model being used
    */
-  Ptr<RescueErrorRateModel> GetErrorRateModel (void) const;
+  //Ptr<RescueErrorRateModel> GetErrorRateModel (void) const;
   
   /**
    * Assign a fixed random variable stream number to the random variables
@@ -212,6 +236,10 @@ public:
   bool IsModeSupported (RescueMode mode) const;
 
   /**
+   * \return a RescueMode for OFDM at 3Mbps
+   */
+  static RescueMode GetOfdm3Mbps ();
+  /**
    * \return a RescueMode for OFDM at 6Mbps
    */
   static RescueMode GetOfdm6Mbps ();
@@ -246,7 +274,7 @@ private:
    * \param mode
    * \return the success rate
    */
-  double CalculateChunkSuccessRate (double snir, Time duration, RescueMode mode);
+  //double CalculateChunkSuccessRate (double snir, Time duration, RescueMode mode);
   /**
    * Calculate LLR
    * CURRENTLY NOT IMPLEMENTED
@@ -274,30 +302,36 @@ private:
    * \param mode the PHY TX mode of received frame
    * \return true if previous copies of the frame were found
    */
-  bool AddFrameCopy (Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, double per, RescueMode mode);
+  bool AddFrameCopy (Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, double per, double ber, RescueMode mode);
   /**
    * Checks if frame was succesfully restored from stored copies.
    *
    * \param phyHdr PHY header associated with frame to check
    * \return true if frame was succesfully restored
    */
-  bool IsRestored (RescuePhyHeader phyHdr);
+  bool IsRestored (RescuePhyHeader phyHdr, bool useBB2);
 
 
   Ptr<RescueNetDevice> m_device;                //!< Pointer to RescueNetDevice
   Ptr<RescueMac> m_mac;                         //!< Pointer to RescueMac
+  Ptr<LowRescueMac> m_lowMac;                   //!< Pointer to current LowRescueMac (CSMA or TDMA)
+  Ptr<RescueMacCsma> m_csmaMac;                 //!< Pointer to CSMA MAC
+  Ptr<RescueMacTdma> m_tdmaMac;                 //!< Pointer to TDMA MAC
   Ptr<RescueChannel> m_channel;                 //!< Pointer to associated RescueChannel.
-  Ptr<RescueErrorRateModel> m_errorRateModel;   //!< Pointer to RescueErrorRateModel.
+  //Ptr<RescueErrorRateModel> m_errorRateModel;   //!< Pointer to RescueErrorRateModel.
   Ptr<UniformRandomVariable> m_random;          //!< Provides uniform random variables.
   
   // PHY parameters
   double m_txPower;                 //!< transmission power (dBm)
   double m_csThr;                   //!< carrier sense threshold (dBm)
+  double m_rxThr;                   //!< rx power threshold (dBm)
   Time m_preambleDuration;          //!< duration of preamble
   uint32_t m_trailerSize;           //!< size of trailer (B)
   RescueModeList m_deviceRateSet;   //!< List of supported TX/RX modes (RescueMode)
 
-  double m_perThr; //!< PER threshold - frames with higher PER are unusable for reconstruction purposes and should not be stored or forwarded 
+  double m_berThr; //!< PER threshold - frames with higher PER are unusable for reconstruction purposes and should not be stored or forwarded 
+  bool m_useBB2;   //!< Use BlackBox #2 for error calculation? (if it is possible) 
+  bool m_useLOTF;  //!< Use Rescue links-on-the-fly 
 
   State m_state;    //!< Current state of this PHY
   bool m_csBusy;    //!< Busy channel indicator (true = channel busy)
@@ -334,16 +368,22 @@ private:
                    Ptr<Packet> pkt,
                    std::vector<double> snr_db,
                    std::vector<double> linkPER,
-                   double constellationSize, 
-                   double spectralEfficiency, 
+                   std::vector<double> linkBER,
+                   //int constellationSize, 
+                   std::vector<int> constellationSizes,
+                   //double spectralEfficiency, 
+                   std::vector<double> spectralEfficiencies,
                    int packetLength,
                    Time tstamp);
     RescuePhyHeader phyHdr;
     Ptr<Packet> pkt;
     std::vector<double> snr_db;
     std::vector<double> linkPER;
-    double constellationSize;
-    double spectralEfficiency; 
+    std::vector<double> linkBER;
+    //int constellationSize;
+    std::vector<int> constellationSizes;
+    //double spectralEfficiency;
+    std::vector<double> spectralEfficiencies;
     int packetLength;
     Time tstamp;
   };

@@ -40,9 +40,13 @@ SnrPerTag::GetTypeId (void)
                    DoubleValue (0.0),
                    MakeDoubleAccessor (&SnrPerTag::GetSNR),
                    MakeDoubleChecker<double> ())
-    .AddAttribute ("PER", "The PER of the last packet received",
+    /*.AddAttribute ("PER", "The PER of the last packet received",
                    DoubleValue (0.0),
                    MakeDoubleAccessor (&SnrPerTag::GetPER),
+                   MakeDoubleChecker<double> ())*/
+    .AddAttribute ("BER", "The BER of the last packet received",
+                   DoubleValue (0.0),
+                   MakeDoubleAccessor (&SnrPerTag::GetBER),
                    MakeDoubleChecker<double> ())
   ;
   return tid;
@@ -56,13 +60,16 @@ SnrPerTag::GetInstanceTypeId (void) const
 
 SnrPerTag::SnrPerTag ()
   : m_snr (0),
-    m_per (0)
+    //m_per (0),
+    m_ber (0)
 {
 }
 
-SnrPerTag::SnrPerTag (double snr, double per)
+
+SnrPerTag::SnrPerTag (double snr, /*double per,*/ double ber)
   : m_snr (snr),
-    m_per (per)
+    //m_per (per),
+    m_ber (ber)
 {
 }
 
@@ -77,20 +84,22 @@ void
 SnrPerTag::Serialize (TagBuffer i) const
 {
   i.WriteDouble (m_snr);
-  i.WriteDouble (m_per);
+  //i.WriteDouble (m_per);
+  i.WriteDouble (m_ber);
 }
 
 void
 SnrPerTag::Deserialize (TagBuffer i)
 {
   m_snr = i.ReadDouble ();
-  m_per = i.ReadDouble ();
+  //m_per = i.ReadDouble ();
+  m_ber = i.ReadDouble ();
 }
 
 void
 SnrPerTag::Print (std::ostream &os) const
 {
-  os << "snr=" << m_snr << ", per=" << m_per;
+  os << "snr=" << m_snr << /*" per=" << m_per <<*/ " ber=" << m_ber;
 }
 
 void
@@ -99,10 +108,16 @@ SnrPerTag::SetSNR (double snr)
   m_snr = snr;
 }
 
-void
+/*void
 SnrPerTag::SetPER (double per)
 {
   m_per = per;
+}*/
+
+void
+SnrPerTag::SetBER (double ber)
+{
+  m_ber = ber;
 }
 
 double
@@ -111,10 +126,16 @@ SnrPerTag::GetSNR (void) const
   return m_snr;
 }
 
-double
+/*double
 SnrPerTag::GetPER (void) const
 {
   return m_per;
+}*/
+
+double
+SnrPerTag::GetBER (void) const
+{
+  return m_ber;
 }
 
 

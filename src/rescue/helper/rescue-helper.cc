@@ -1,6 +1,7 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2010 University of Arizona
+ * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -49,7 +50,8 @@ RescuePhyHelper::~RescuePhyHelper ()
 
 RescueHelper::RescueHelper ()
 {
-  m_mac.SetTypeId ("ns3::RescueMacCsma");
+  //m_mac.SetTypeId ("ns3::RescueMacCsma");
+  m_mac.SetTypeId ("ns3::AdhocRescueMac");
   m_phy.SetTypeId ("ns3::RescuePhy");
   //m_stationManager.SetTypeId ("ns3::RescueRemoteStationManager");
 }
@@ -94,6 +96,7 @@ RescueHelper::SetRemoteStationManager (std::string type,
 NetDeviceContainer
 RescueHelper::Install (NodeContainer c, Ptr<RescueChannel> channel, const RescuePhyHelper &phyHelper, const RescueMacHelper &macHelper) const
 {
+  NS_LOG_FUNCTION ("");
   NetDeviceContainer devices;
   for (NodeContainer::Iterator i = c.Begin (); i != c.End (); i++)
     {

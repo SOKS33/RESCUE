@@ -131,6 +131,9 @@ RescueMode::GetSpectralEfficiency (void) const
     case RESCUE_CODE_RATE_1_2:
       return log2 (item->constellationSize) * 1 / 2;
       break;
+    case RESCUE_CODE_RATE_1_4:
+      return log2 (item->constellationSize) * 1 / 4;
+      break;
     case RESCUE_CODE_RATE_UNDEFINED:
     default:
       return 1;
@@ -191,6 +194,9 @@ RescueModeFactory::CreateRescueMode (std::string uniqueName,
       break;
     case RESCUE_CODE_RATE_1_2:
       item->phyRate = dataRate * 2 / 1;
+      break;
+    case RESCUE_CODE_RATE_1_4:
+      item->phyRate = dataRate * 4 / 1;
       break;
     case RESCUE_CODE_RATE_UNDEFINED:
     default:

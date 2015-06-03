@@ -20,8 +20,10 @@ def module_init():
 def register_types(module):
     root_module = module.get_root()
     
+    ## rescue-mac.h (module 'rescue'): ns3::StationType [enumeration]
+    module.add_enum('StationType', ['STA', 'AP', 'ADHOC_STA'])
     ## rescue-mode.h (module 'rescue'): ns3::RescueCodeRate [enumeration]
-    module.add_enum('RescueCodeRate', ['RESCUE_CODE_RATE_UNDEFINED', 'RESCUE_CODE_RATE_3_4', 'RESCUE_CODE_RATE_2_3', 'RESCUE_CODE_RATE_1_2', 'RESCUE_CODE_RATE_5_6'])
+    module.add_enum('RescueCodeRate', ['RESCUE_CODE_RATE_UNDEFINED', 'RESCUE_CODE_RATE_3_4', 'RESCUE_CODE_RATE_2_3', 'RESCUE_CODE_RATE_1_2', 'RESCUE_CODE_RATE_1_4', 'RESCUE_CODE_RATE_5_6'])
     ## rescue-mode.h (module 'rescue'): ns3::RescueModulationClass [enumeration]
     module.add_enum('RescueModulationClass', ['RESCUE_MOD_CLASS_UNKNOWN', 'RESCUE_MOD_CLASS_OFDM'])
     ## address.h (module 'network'): ns3::Address [class]
@@ -90,6 +92,8 @@ def register_types(module):
     module.add_class('ObjectDeleter', import_from_module='ns.core')
     ## object-factory.h (module 'core'): ns3::ObjectFactory [class]
     module.add_class('ObjectFactory', import_from_module='ns.core')
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1 [class]
+    module.add_class('OutputBlackBox_no1')
     ## packet-metadata.h (module 'network'): ns3::PacketMetadata [class]
     module.add_class('PacketMetadata', import_from_module='ns.network')
     ## packet-metadata.h (module 'network'): ns3::PacketMetadata::Item [struct]
@@ -150,6 +154,8 @@ def register_types(module):
     module.add_class('int64x64_t', import_from_module='ns.core')
     ## int64x64-double.h (module 'core'): ns3::int64x64_t::impl_type [enumeration]
     module.add_enum('impl_type', ['int128_impl', 'cairo_impl', 'ld_impl'], outer_class=root_module['ns3::int64x64_t'], import_from_module='ns.core')
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): ns3::AdhocRescueMacHelper [class]
+    module.add_class('AdhocRescueMacHelper', parent=root_module['ns3::RescueMacHelper'])
     ## chunk.h (module 'network'): ns3::Chunk [class]
     module.add_class('Chunk', import_from_module='ns.network', parent=root_module['ns3::ObjectBase'])
     ## header.h (module 'network'): ns3::Header [class]
@@ -176,18 +182,12 @@ def register_types(module):
     module.add_class('RandomVariableStream', import_from_module='ns.core', parent=root_module['ns3::Object'])
     ## propagation-loss-model.h (module 'propagation'): ns3::RangePropagationLossModel [class]
     module.add_class('RangePropagationLossModel', import_from_module='ns.propagation', parent=root_module['ns3::PropagationLossModel'])
-    ## rescue-error-rate-model.h (module 'rescue'): ns3::RescueErrorRateModel [class]
-    module.add_class('RescueErrorRateModel', parent=root_module['ns3::Object'])
+    ## rescue-arq-manager.h (module 'rescue'): ns3::RescueArqManager [class]
+    module.add_class('RescueArqManager', parent=root_module['ns3::Object'])
     ## rescue-mac.h (module 'rescue'): ns3::RescueMac [class]
     module.add_class('RescueMac', parent=root_module['ns3::Object'])
-    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma [class]
-    module.add_class('RescueMacCsma', parent=root_module['ns3::RescueMac'])
-    ## rescue-mac-csma-helper.h (module 'rescue'): ns3::RescueMacCsmaHelper [class]
-    module.add_class('RescueMacCsmaHelper', parent=root_module['ns3::RescueMacHelper'])
     ## rescue-mac-header.h (module 'rescue'): ns3::RescueMacHeader [class]
     module.add_class('RescueMacHeader', parent=root_module['ns3::Header'])
-    ## rescue-nist-error-rate-model.h (module 'rescue'): ns3::RescueNistErrorRateModel [class]
-    module.add_class('RescueNistErrorRateModel', parent=root_module['ns3::RescueErrorRateModel'])
     ## rescue-phy.h (module 'rescue'): ns3::RescuePhy [class]
     module.add_class('RescuePhy', parent=root_module['ns3::Object'])
     ## rescue-phy.h (module 'rescue'): ns3::RescuePhy::State [enumeration]
@@ -244,6 +244,8 @@ def register_types(module):
     module.add_class('SocketIpv6TclassTag', import_from_module='ns.network', parent=root_module['ns3::Tag'])
     ## socket.h (module 'network'): ns3::SocketSetDontFragmentTag [class]
     module.add_class('SocketSetDontFragmentTag', import_from_module='ns.network', parent=root_module['ns3::Tag'])
+    ## sta-rescue-mac.h (module 'rescue'): ns3::StaRescueMac [class]
+    module.add_class('StaRescueMac', parent=root_module['ns3::RescueMac'])
     ## propagation-loss-model.h (module 'propagation'): ns3::ThreeLogDistancePropagationLossModel [class]
     module.add_class('ThreeLogDistancePropagationLossModel', import_from_module='ns.propagation', parent=root_module['ns3::PropagationLossModel'])
     ## nstime.h (module 'core'): ns3::Time [class]
@@ -268,14 +270,20 @@ def register_types(module):
     module.add_class('ZetaRandomVariable', import_from_module='ns.core', parent=root_module['ns3::RandomVariableStream'])
     ## random-variable-stream.h (module 'core'): ns3::ZipfRandomVariable [class]
     module.add_class('ZipfRandomVariable', import_from_module='ns.core', parent=root_module['ns3::RandomVariableStream'])
+    ## adhoc-rescue-mac.h (module 'rescue'): ns3::AdhocRescueMac [class]
+    module.add_class('AdhocRescueMac', parent=root_module['ns3::RescueMac'])
+    ## ap-rescue-mac.h (module 'rescue'): ns3::ApRescueMac [class]
+    module.add_class('ApRescueMac', parent=root_module['ns3::RescueMac'])
     ## attribute.h (module 'core'): ns3::AttributeAccessor [class]
     module.add_class('AttributeAccessor', import_from_module='ns.core', parent=root_module['ns3::SimpleRefCount< ns3::AttributeAccessor, ns3::empty, ns3::DefaultDeleter<ns3::AttributeAccessor> >'])
     ## attribute.h (module 'core'): ns3::AttributeChecker [class]
     module.add_class('AttributeChecker', allow_subclassing=False, automatic_type_narrowing=True, import_from_module='ns.core', parent=root_module['ns3::SimpleRefCount< ns3::AttributeChecker, ns3::empty, ns3::DefaultDeleter<ns3::AttributeChecker> >'])
     ## attribute.h (module 'core'): ns3::AttributeValue [class]
     module.add_class('AttributeValue', allow_subclassing=False, automatic_type_narrowing=True, import_from_module='ns.core', parent=root_module['ns3::SimpleRefCount< ns3::AttributeValue, ns3::empty, ns3::DefaultDeleter<ns3::AttributeValue> >'])
-    ## blackbox.h (module 'rescue'): ns3::BlackBox [class]
-    module.add_class('BlackBox', parent=root_module['ns3::Object'])
+    ## blackbox_no1.h (module 'rescue'): ns3::BlackBox_no1 [class]
+    module.add_class('BlackBox_no1', parent=root_module['ns3::Object'])
+    ## blackbox_no2.h (module 'rescue'): ns3::BlackBox_no2 [class]
+    module.add_class('BlackBox_no2', parent=root_module['ns3::Object'])
     ## boolean.h (module 'core'): ns3::BooleanChecker [class]
     module.add_class('BooleanChecker', import_from_module='ns.core', parent=root_module['ns3::AttributeChecker'])
     ## boolean.h (module 'core'): ns3::BooleanValue [class]
@@ -352,6 +360,8 @@ def register_types(module):
     module.add_class('LogDistancePropagationLossModel', import_from_module='ns.propagation', parent=root_module['ns3::PropagationLossModel'])
     ## random-variable-stream.h (module 'core'): ns3::LogNormalRandomVariable [class]
     module.add_class('LogNormalRandomVariable', import_from_module='ns.core', parent=root_module['ns3::RandomVariableStream'])
+    ## low-rescue-mac.h (module 'rescue'): ns3::LowRescueMac [class]
+    module.add_class('LowRescueMac', parent=root_module['ns3::Object'])
     ## mac48-address.h (module 'network'): ns3::Mac48AddressChecker [class]
     module.add_class('Mac48AddressChecker', import_from_module='ns.network', parent=root_module['ns3::AttributeChecker'])
     ## mac48-address.h (module 'network'): ns3::Mac48AddressValue [class]
@@ -388,6 +398,12 @@ def register_types(module):
     module.add_class('PointerValue', import_from_module='ns.core', parent=root_module['ns3::AttributeValue'])
     ## rescue-channel.h (module 'rescue'): ns3::RescueChannel [class]
     module.add_class('RescueChannel', parent=root_module['ns3::Channel'])
+    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma [class]
+    module.add_class('RescueMacCsma', parent=root_module['ns3::LowRescueMac'])
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::RescueMacTdma [class]
+    module.add_class('RescueMacTdma', parent=root_module['ns3::LowRescueMac'])
+    ## rescue-mac-trailer.h (module 'rescue'): ns3::RescueMacTrailer [class]
+    module.add_class('RescueMacTrailer', parent=root_module['ns3::Trailer'])
     ## rescue-mode.h (module 'rescue'): ns3::RescueModeChecker [class]
     module.add_class('RescueModeChecker', parent=root_module['ns3::AttributeChecker'])
     ## rescue-mode.h (module 'rescue'): ns3::RescueModeValue [class]
@@ -408,19 +424,20 @@ def register_types(module):
     module.add_class('AddressValue', import_from_module='ns.network', parent=root_module['ns3::AttributeValue'])
     module.add_container('ns3::RescueModeList', 'ns3::RescueMode', container_type=u'vector')
     module.add_container('std::vector< double >', 'double', container_type=u'vector')
+    module.add_container('std::vector< int >', 'int', container_type=u'vector')
     module.add_container('std::map< unsigned int, unsigned int >', ('unsigned int', 'unsigned int'), container_type=u'map')
-    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >', u'ns3::RescueModeListIterator')
-    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >*', u'ns3::RescueModeListIterator*')
-    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >&', u'ns3::RescueModeListIterator&')
     typehandlers.add_type_alias(u'std::vector< unsigned char, std::allocator< unsigned char > >', u'ns3::RescueMcsList')
     typehandlers.add_type_alias(u'std::vector< unsigned char, std::allocator< unsigned char > >*', u'ns3::RescueMcsList*')
     typehandlers.add_type_alias(u'std::vector< unsigned char, std::allocator< unsigned char > >&', u'ns3::RescueMcsList&')
-    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >', u'ns3::RescueModeList')
-    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >*', u'ns3::RescueModeList*')
-    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >&', u'ns3::RescueModeList&')
     typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< unsigned char const *, std::vector< unsigned char, std::allocator< unsigned char > > >', u'ns3::RescueMcsListIterator')
     typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< unsigned char const *, std::vector< unsigned char, std::allocator< unsigned char > > >*', u'ns3::RescueMcsListIterator*')
     typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< unsigned char const *, std::vector< unsigned char, std::allocator< unsigned char > > >&', u'ns3::RescueMcsListIterator&')
+    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >', u'ns3::RescueModeListIterator')
+    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >*', u'ns3::RescueModeListIterator*')
+    typehandlers.add_type_alias(u'__gnu_cxx::__normal_iterator< ns3::RescueMode const *, std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > > >&', u'ns3::RescueModeListIterator&')
+    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >', u'ns3::RescueModeList')
+    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >*', u'ns3::RescueModeList*')
+    typehandlers.add_type_alias(u'std::vector< ns3::RescueMode, std::allocator< ns3::RescueMode > >&', u'ns3::RescueModeList&')
     
     ## Register a nested module for the namespace FatalImpl
     
@@ -449,12 +466,12 @@ def register_types_ns3_Hash(module):
     
     ## hash-function.h (module 'core'): ns3::Hash::Implementation [class]
     module.add_class('Implementation', import_from_module='ns.core', parent=root_module['ns3::SimpleRefCount< ns3::Hash::Implementation, ns3::empty, ns3::DefaultDeleter<ns3::Hash::Implementation> >'])
-    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) *', u'ns3::Hash::Hash32Function_ptr')
-    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) **', u'ns3::Hash::Hash32Function_ptr*')
-    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) *&', u'ns3::Hash::Hash32Function_ptr&')
     typehandlers.add_type_alias(u'uint64_t ( * ) ( char const *, size_t ) *', u'ns3::Hash::Hash64Function_ptr')
     typehandlers.add_type_alias(u'uint64_t ( * ) ( char const *, size_t ) **', u'ns3::Hash::Hash64Function_ptr*')
     typehandlers.add_type_alias(u'uint64_t ( * ) ( char const *, size_t ) *&', u'ns3::Hash::Hash64Function_ptr&')
+    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) *', u'ns3::Hash::Hash32Function_ptr')
+    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) **', u'ns3::Hash::Hash32Function_ptr*')
+    typehandlers.add_type_alias(u'uint32_t ( * ) ( char const *, size_t ) *&', u'ns3::Hash::Hash32Function_ptr&')
     
     ## Register a nested module for the namespace Function
     
@@ -505,6 +522,7 @@ def register_methods(root_module):
     register_Ns3ObjectBase_methods(root_module, root_module['ns3::ObjectBase'])
     register_Ns3ObjectDeleter_methods(root_module, root_module['ns3::ObjectDeleter'])
     register_Ns3ObjectFactory_methods(root_module, root_module['ns3::ObjectFactory'])
+    register_Ns3OutputBlackBox_no1_methods(root_module, root_module['ns3::OutputBlackBox_no1'])
     register_Ns3PacketMetadata_methods(root_module, root_module['ns3::PacketMetadata'])
     register_Ns3PacketMetadataItem_methods(root_module, root_module['ns3::PacketMetadata::Item'])
     register_Ns3PacketMetadataItemIterator_methods(root_module, root_module['ns3::PacketMetadata::ItemIterator'])
@@ -530,6 +548,7 @@ def register_methods(root_module):
     register_Ns3TypeIdTraceSourceInformation_methods(root_module, root_module['ns3::TypeId::TraceSourceInformation'])
     register_Ns3Empty_methods(root_module, root_module['ns3::empty'])
     register_Ns3Int64x64_t_methods(root_module, root_module['ns3::int64x64_t'])
+    register_Ns3AdhocRescueMacHelper_methods(root_module, root_module['ns3::AdhocRescueMacHelper'])
     register_Ns3Chunk_methods(root_module, root_module['ns3::Chunk'])
     register_Ns3Header_methods(root_module, root_module['ns3::Header'])
     register_Ns3Ipv4Header_methods(root_module, root_module['ns3::Ipv4Header'])
@@ -541,12 +560,9 @@ def register_methods(root_module):
     register_Ns3RandomPropagationLossModel_methods(root_module, root_module['ns3::RandomPropagationLossModel'])
     register_Ns3RandomVariableStream_methods(root_module, root_module['ns3::RandomVariableStream'])
     register_Ns3RangePropagationLossModel_methods(root_module, root_module['ns3::RangePropagationLossModel'])
-    register_Ns3RescueErrorRateModel_methods(root_module, root_module['ns3::RescueErrorRateModel'])
+    register_Ns3RescueArqManager_methods(root_module, root_module['ns3::RescueArqManager'])
     register_Ns3RescueMac_methods(root_module, root_module['ns3::RescueMac'])
-    register_Ns3RescueMacCsma_methods(root_module, root_module['ns3::RescueMacCsma'])
-    register_Ns3RescueMacCsmaHelper_methods(root_module, root_module['ns3::RescueMacCsmaHelper'])
     register_Ns3RescueMacHeader_methods(root_module, root_module['ns3::RescueMacHeader'])
-    register_Ns3RescueNistErrorRateModel_methods(root_module, root_module['ns3::RescueNistErrorRateModel'])
     register_Ns3RescuePhy_methods(root_module, root_module['ns3::RescuePhy'])
     register_Ns3RescuePhyBasicHelper_methods(root_module, root_module['ns3::RescuePhyBasicHelper'])
     register_Ns3RescuePhyHeader_methods(root_module, root_module['ns3::RescuePhyHeader'])
@@ -572,6 +588,7 @@ def register_methods(root_module):
     register_Ns3SocketIpv6HopLimitTag_methods(root_module, root_module['ns3::SocketIpv6HopLimitTag'])
     register_Ns3SocketIpv6TclassTag_methods(root_module, root_module['ns3::SocketIpv6TclassTag'])
     register_Ns3SocketSetDontFragmentTag_methods(root_module, root_module['ns3::SocketSetDontFragmentTag'])
+    register_Ns3StaRescueMac_methods(root_module, root_module['ns3::StaRescueMac'])
     register_Ns3ThreeLogDistancePropagationLossModel_methods(root_module, root_module['ns3::ThreeLogDistancePropagationLossModel'])
     register_Ns3Time_methods(root_module, root_module['ns3::Time'])
     register_Ns3TraceSourceAccessor_methods(root_module, root_module['ns3::TraceSourceAccessor'])
@@ -582,10 +599,13 @@ def register_methods(root_module):
     register_Ns3WeibullRandomVariable_methods(root_module, root_module['ns3::WeibullRandomVariable'])
     register_Ns3ZetaRandomVariable_methods(root_module, root_module['ns3::ZetaRandomVariable'])
     register_Ns3ZipfRandomVariable_methods(root_module, root_module['ns3::ZipfRandomVariable'])
+    register_Ns3AdhocRescueMac_methods(root_module, root_module['ns3::AdhocRescueMac'])
+    register_Ns3ApRescueMac_methods(root_module, root_module['ns3::ApRescueMac'])
     register_Ns3AttributeAccessor_methods(root_module, root_module['ns3::AttributeAccessor'])
     register_Ns3AttributeChecker_methods(root_module, root_module['ns3::AttributeChecker'])
     register_Ns3AttributeValue_methods(root_module, root_module['ns3::AttributeValue'])
-    register_Ns3BlackBox_methods(root_module, root_module['ns3::BlackBox'])
+    register_Ns3BlackBox_no1_methods(root_module, root_module['ns3::BlackBox_no1'])
+    register_Ns3BlackBox_no2_methods(root_module, root_module['ns3::BlackBox_no2'])
     register_Ns3BooleanChecker_methods(root_module, root_module['ns3::BooleanChecker'])
     register_Ns3BooleanValue_methods(root_module, root_module['ns3::BooleanValue'])
     register_Ns3CallbackChecker_methods(root_module, root_module['ns3::CallbackChecker'])
@@ -623,6 +643,7 @@ def register_methods(root_module):
     register_Ns3Ipv6PrefixValue_methods(root_module, root_module['ns3::Ipv6PrefixValue'])
     register_Ns3LogDistancePropagationLossModel_methods(root_module, root_module['ns3::LogDistancePropagationLossModel'])
     register_Ns3LogNormalRandomVariable_methods(root_module, root_module['ns3::LogNormalRandomVariable'])
+    register_Ns3LowRescueMac_methods(root_module, root_module['ns3::LowRescueMac'])
     register_Ns3Mac48AddressChecker_methods(root_module, root_module['ns3::Mac48AddressChecker'])
     register_Ns3Mac48AddressValue_methods(root_module, root_module['ns3::Mac48AddressValue'])
     register_Ns3MatrixPropagationLossModel_methods(root_module, root_module['ns3::MatrixPropagationLossModel'])
@@ -640,6 +661,9 @@ def register_methods(root_module):
     register_Ns3PointerChecker_methods(root_module, root_module['ns3::PointerChecker'])
     register_Ns3PointerValue_methods(root_module, root_module['ns3::PointerValue'])
     register_Ns3RescueChannel_methods(root_module, root_module['ns3::RescueChannel'])
+    register_Ns3RescueMacCsma_methods(root_module, root_module['ns3::RescueMacCsma'])
+    register_Ns3RescueMacTdma_methods(root_module, root_module['ns3::RescueMacTdma'])
+    register_Ns3RescueMacTrailer_methods(root_module, root_module['ns3::RescueMacTrailer'])
     register_Ns3RescueModeChecker_methods(root_module, root_module['ns3::RescueModeChecker'])
     register_Ns3RescueModeValue_methods(root_module, root_module['ns3::RescueModeValue'])
     register_Ns3RescueNetDevice_methods(root_module, root_module['ns3::RescueNetDevice'])
@@ -657,8 +681,8 @@ def register_methods(root_module):
     return
 
 def register_Ns3Address_methods(root_module, cls):
-    cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('!=')
+    cls.add_binary_comparison_operator('<')
     cls.add_output_stream_operator()
     cls.add_binary_comparison_operator('==')
     ## address.h (module 'network'): ns3::Address::Address() [constructor]
@@ -1303,8 +1327,8 @@ def register_Ns3InetSocketAddress_methods(root_module, cls):
     return
 
 def register_Ns3Ipv4Address_methods(root_module, cls):
-    cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('!=')
+    cls.add_binary_comparison_operator('<')
     cls.add_output_stream_operator()
     cls.add_binary_comparison_operator('==')
     ## ipv4-address.h (module 'network'): ns3::Ipv4Address::Ipv4Address(ns3::Ipv4Address const & arg0) [copy constructor]
@@ -1535,8 +1559,8 @@ def register_Ns3Ipv4Mask_methods(root_module, cls):
     return
 
 def register_Ns3Ipv6Address_methods(root_module, cls):
-    cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('!=')
+    cls.add_binary_comparison_operator('<')
     cls.add_output_stream_operator()
     cls.add_binary_comparison_operator('==')
     ## ipv6-address.h (module 'network'): ns3::Ipv6Address::Ipv6Address() [constructor]
@@ -1792,8 +1816,8 @@ def register_Ns3Ipv6Prefix_methods(root_module, cls):
     return
 
 def register_Ns3Mac48Address_methods(root_module, cls):
-    cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('!=')
+    cls.add_binary_comparison_operator('<')
     cls.add_output_stream_operator()
     cls.add_binary_comparison_operator('==')
     ## mac48-address.h (module 'network'): ns3::Mac48Address::Mac48Address(ns3::Mac48Address const & arg0) [copy constructor]
@@ -2079,6 +2103,19 @@ def register_Ns3ObjectFactory_methods(root_module, cls):
     cls.add_method('SetTypeId', 
                    'void', 
                    [param('std::string', 'tid')])
+    return
+
+def register_Ns3OutputBlackBox_no1_methods(root_module, cls):
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1::OutputBlackBox_no1() [constructor]
+    cls.add_constructor([])
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1::OutputBlackBox_no1(ns3::OutputBlackBox_no1 const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::OutputBlackBox_no1 const &', 'arg0')])
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1::ber [variable]
+    cls.add_instance_attribute('ber', 'double', is_const=False)
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1::mi [variable]
+    cls.add_instance_attribute('mi', 'double', is_const=False)
+    ## blackbox_no1.h (module 'rescue'): ns3::OutputBlackBox_no1::p_floor [variable]
+    cls.add_instance_attribute('p_floor', 'double', is_const=False)
     return
 
 def register_Ns3PacketMetadata_methods(root_module, cls):
@@ -2416,6 +2453,10 @@ def register_Ns3RescueRemoteStationInfo_methods(root_module, cls):
     cls.add_method('NotifyTxSuccess', 
                    'void', 
                    [param('uint32_t', 'retryCounter')])
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationInfo::NotifyTxSuccessSNR(uint32_t retryCounter, double snr) [member function]
+    cls.add_method('NotifyTxSuccessSNR', 
+                   'void', 
+                   [param('uint32_t', 'retryCounter'), param('double', 'snr')])
     return
 
 def register_Ns3RescueRemoteStationState_methods(root_module, cls):
@@ -2627,8 +2668,8 @@ def register_Ns3TimeWithUnit_methods(root_module, cls):
     return
 
 def register_Ns3TypeId_methods(root_module, cls):
-    cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('!=')
+    cls.add_binary_comparison_operator('<')
     cls.add_output_stream_operator()
     cls.add_binary_comparison_operator('==')
     ## type-id.h (module 'core'): ns3::TypeId::TypeId(char const * name) [constructor]
@@ -2823,6 +2864,9 @@ def register_Ns3Empty_methods(root_module, cls):
     return
 
 def register_Ns3Int64x64_t_methods(root_module, cls):
+    cls.add_binary_comparison_operator('<=')
+    cls.add_binary_comparison_operator('!=')
+    cls.add_inplace_numeric_operator('+=', param('ns3::int64x64_t const &', u'right'))
     cls.add_binary_numeric_operator('*', root_module['ns3::int64x64_t'], root_module['ns3::int64x64_t'], param('ns3::int64x64_t const &', u'right'))
     cls.add_binary_numeric_operator('+', root_module['ns3::int64x64_t'], root_module['ns3::int64x64_t'], param('ns3::int64x64_t const &', u'right'))
     cls.add_binary_numeric_operator('-', root_module['ns3::int64x64_t'], root_module['ns3::int64x64_t'], param('ns3::int64x64_t const &', u'right'))
@@ -2830,13 +2874,10 @@ def register_Ns3Int64x64_t_methods(root_module, cls):
     cls.add_binary_numeric_operator('/', root_module['ns3::int64x64_t'], root_module['ns3::int64x64_t'], param('ns3::int64x64_t const &', u'right'))
     cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('>')
-    cls.add_binary_comparison_operator('!=')
     cls.add_inplace_numeric_operator('*=', param('ns3::int64x64_t const &', u'right'))
-    cls.add_inplace_numeric_operator('+=', param('ns3::int64x64_t const &', u'right'))
     cls.add_inplace_numeric_operator('-=', param('ns3::int64x64_t const &', u'right'))
     cls.add_inplace_numeric_operator('/=', param('ns3::int64x64_t const &', u'right'))
     cls.add_output_stream_operator()
-    cls.add_binary_comparison_operator('<=')
     cls.add_binary_comparison_operator('==')
     cls.add_binary_comparison_operator('>=')
     ## int64x64-double.h (module 'core'): ns3::int64x64_t::int64x64_t() [constructor]
@@ -2887,6 +2928,31 @@ def register_Ns3Int64x64_t_methods(root_module, cls):
                    [param('ns3::int64x64_t const &', 'o')])
     ## int64x64-double.h (module 'core'): ns3::int64x64_t::implementation [variable]
     cls.add_static_attribute('implementation', 'ns3::int64x64_t::impl_type const', is_const=True)
+    return
+
+def register_Ns3AdhocRescueMacHelper_methods(root_module, cls):
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): ns3::AdhocRescueMacHelper::AdhocRescueMacHelper(ns3::AdhocRescueMacHelper const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::AdhocRescueMacHelper const &', 'arg0')])
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): ns3::AdhocRescueMacHelper::AdhocRescueMacHelper() [constructor]
+    cls.add_constructor([])
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): static ns3::AdhocRescueMacHelper ns3::AdhocRescueMacHelper::Default() [member function]
+    cls.add_method('Default', 
+                   'ns3::AdhocRescueMacHelper', 
+                   [], 
+                   is_static=True)
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): void ns3::AdhocRescueMacHelper::Set(std::string n="", ns3::AttributeValue const & v=ns3::EmptyAttributeValue()) [member function]
+    cls.add_method('Set', 
+                   'void', 
+                   [param('std::string', 'n', default_value='""'), param('ns3::AttributeValue const &', 'v', default_value='ns3::EmptyAttributeValue()')])
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): void ns3::AdhocRescueMacHelper::SetType(std::string type, std::string n0="", ns3::AttributeValue const & v0=ns3::EmptyAttributeValue(), std::string n1="", ns3::AttributeValue const & v1=ns3::EmptyAttributeValue(), std::string n2="", ns3::AttributeValue const & v2=ns3::EmptyAttributeValue(), std::string n3="", ns3::AttributeValue const & v3=ns3::EmptyAttributeValue(), std::string n4="", ns3::AttributeValue const & v4=ns3::EmptyAttributeValue(), std::string n5="", ns3::AttributeValue const & v5=ns3::EmptyAttributeValue(), std::string n6="", ns3::AttributeValue const & v6=ns3::EmptyAttributeValue(), std::string n7="", ns3::AttributeValue const & v7=ns3::EmptyAttributeValue(), std::string n8="", ns3::AttributeValue const & v8=ns3::EmptyAttributeValue(), std::string n9="", ns3::AttributeValue const & v9=ns3::EmptyAttributeValue(), std::string n10="", ns3::AttributeValue const & v10=ns3::EmptyAttributeValue(), std::string n11="", ns3::AttributeValue const & v11=ns3::EmptyAttributeValue(), std::string n12="", ns3::AttributeValue const & v12=ns3::EmptyAttributeValue()) [member function]
+    cls.add_method('SetType', 
+                   'void', 
+                   [param('std::string', 'type'), param('std::string', 'n0', default_value='""'), param('ns3::AttributeValue const &', 'v0', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n1', default_value='""'), param('ns3::AttributeValue const &', 'v1', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n2', default_value='""'), param('ns3::AttributeValue const &', 'v2', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n3', default_value='""'), param('ns3::AttributeValue const &', 'v3', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n4', default_value='""'), param('ns3::AttributeValue const &', 'v4', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n5', default_value='""'), param('ns3::AttributeValue const &', 'v5', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n6', default_value='""'), param('ns3::AttributeValue const &', 'v6', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n7', default_value='""'), param('ns3::AttributeValue const &', 'v7', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n8', default_value='""'), param('ns3::AttributeValue const &', 'v8', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n9', default_value='""'), param('ns3::AttributeValue const &', 'v9', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n10', default_value='""'), param('ns3::AttributeValue const &', 'v10', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n11', default_value='""'), param('ns3::AttributeValue const &', 'v11', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n12', default_value='""'), param('ns3::AttributeValue const &', 'v12', default_value='ns3::EmptyAttributeValue()')])
+    ## adhoc-rescue-mac-helper.h (module 'rescue'): ns3::Ptr<ns3::RescueMac> ns3::AdhocRescueMacHelper::Create() const [member function]
+    cls.add_method('Create', 
+                   'ns3::Ptr< ns3::RescueMac >', 
+                   [], 
+                   is_const=True, visibility='private', is_virtual=True)
     return
 
 def register_Ns3Chunk_methods(root_module, cls):
@@ -3350,225 +3416,195 @@ def register_Ns3RangePropagationLossModel_methods(root_module, cls):
                    visibility='private', is_virtual=True)
     return
 
-def register_Ns3RescueErrorRateModel_methods(root_module, cls):
-    ## rescue-error-rate-model.h (module 'rescue'): ns3::RescueErrorRateModel::RescueErrorRateModel() [constructor]
+def register_Ns3RescueArqManager_methods(root_module, cls):
+    ## rescue-arq-manager.h (module 'rescue'): ns3::RescueArqManager::RescueArqManager(ns3::RescueArqManager const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::RescueArqManager const &', 'arg0')])
+    ## rescue-arq-manager.h (module 'rescue'): ns3::RescueArqManager::RescueArqManager() [constructor]
     cls.add_constructor([])
-    ## rescue-error-rate-model.h (module 'rescue'): ns3::RescueErrorRateModel::RescueErrorRateModel(ns3::RescueErrorRateModel const & arg0) [copy constructor]
-    cls.add_constructor([param('ns3::RescueErrorRateModel const &', 'arg0')])
-    ## rescue-error-rate-model.h (module 'rescue'): double ns3::RescueErrorRateModel::CalculateSnr(ns3::RescueMode txMode, double ber) const [member function]
-    cls.add_method('CalculateSnr', 
-                   'double', 
-                   [param('ns3::RescueMode', 'txMode'), param('double', 'ber')], 
+    ## rescue-arq-manager.h (module 'rescue'): uint16_t ns3::RescueArqManager::GetNextSeqNumberByAddress(ns3::Mac48Address addr) const [member function]
+    cls.add_method('GetNextSeqNumberByAddress', 
+                   'uint16_t', 
+                   [param('ns3::Mac48Address', 'addr')], 
                    is_const=True)
-    ## rescue-error-rate-model.h (module 'rescue'): double ns3::RescueErrorRateModel::GetChunkSuccessRate(ns3::RescueMode mode, double snr, uint32_t nbits) const [member function]
-    cls.add_method('GetChunkSuccessRate', 
-                   'double', 
-                   [param('ns3::RescueMode', 'mode'), param('double', 'snr'), param('uint32_t', 'nbits')], 
-                   is_pure_virtual=True, is_const=True, is_virtual=True)
-    ## rescue-error-rate-model.h (module 'rescue'): static ns3::TypeId ns3::RescueErrorRateModel::GetTypeId() [member function]
-    cls.add_method('GetTypeId', 
-                   'ns3::TypeId', 
-                   [], 
-                   is_static=True)
+    ## rescue-arq-manager.h (module 'rescue'): uint16_t ns3::RescueArqManager::GetNextSequenceNumber(ns3::RescuePhyHeader const * hdr) [member function]
+    cls.add_method('GetNextSequenceNumber', 
+                   'uint16_t', 
+                   [param('ns3::RescuePhyHeader const *', 'hdr')])
+    ## rescue-arq-manager.h (module 'rescue'): uint16_t ns3::RescueArqManager::GetNextSequenceNumber(ns3::RescueMacHeader const * hdr) [member function]
+    cls.add_method('GetNextSequenceNumber', 
+                   'uint16_t', 
+                   [param('ns3::RescueMacHeader const *', 'hdr')])
     return
 
 def register_Ns3RescueMac_methods(root_module, cls):
-    ## rescue-mac.h (module 'rescue'): ns3::RescueMac::RescueMac() [constructor]
-    cls.add_constructor([])
     ## rescue-mac.h (module 'rescue'): ns3::RescueMac::RescueMac(ns3::RescueMac const & arg0) [copy constructor]
     cls.add_constructor([param('ns3::RescueMac const &', 'arg0')])
+    ## rescue-mac.h (module 'rescue'): ns3::RescueMac::RescueMac() [constructor]
+    cls.add_constructor([])
     ## rescue-mac.h (module 'rescue'): int64_t ns3::RescueMac::AssignStreams(int64_t stream) [member function]
     cls.add_method('AssignStreams', 
                    'int64_t', 
-                   [param('int64_t', 'stream')], 
-                   is_pure_virtual=True, is_virtual=True)
+                   [param('int64_t', 'stream')])
     ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::AttachPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
     cls.add_method('AttachPhy', 
                    'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')], 
-                   is_pure_virtual=True, is_virtual=True)
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')])
     ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::Clear() [member function]
     cls.add_method('Clear', 
                    'void', 
                    [], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): bool ns3::RescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+                   is_virtual=True)
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
     cls.add_method('Enqueue', 
-                   'bool', 
+                   'void', 
                    [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
-                   is_pure_virtual=True, is_virtual=True)
+                   is_virtual=True)
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::EnqueueOk(ns3::Ptr<const ns3::Packet> pkt, ns3::RescueMacHeader const & hdr) [member function]
+    cls.add_method('EnqueueOk', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet const >', 'pkt'), param('ns3::RescueMacHeader const &', 'hdr')])
     ## rescue-mac.h (module 'rescue'): ns3::Mac48Address ns3::RescueMac::GetAddress() const [member function]
     cls.add_method('GetAddress', 
                    'ns3::Mac48Address', 
                    [], 
-                   is_pure_virtual=True, is_const=True, is_virtual=True)
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Time ns3::RescueMac::GetBasicAckTimeout() const [member function]
+    cls.add_method('GetBasicAckTimeout', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
     ## rescue-mac.h (module 'rescue'): ns3::Mac48Address ns3::RescueMac::GetBroadcast() const [member function]
     cls.add_method('GetBroadcast', 
                    'ns3::Mac48Address', 
                    [], 
-                   is_pure_virtual=True, is_const=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::ReceivePacket(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> packet) [member function]
-    cls.add_method('ReceivePacket', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'packet')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::ReceivePacketDone(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr, double snr, ns3::RescueMode mode, bool correctPhyHdr, bool correctData, bool wasReconstructed) [member function]
-    cls.add_method('ReceivePacketDone', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr'), param('double', 'snr'), param('ns3::RescueMode', 'mode'), param('bool', 'correctPhyHdr'), param('bool', 'correctData'), param('bool', 'wasReconstructed')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SendPacketDone(ns3::Ptr<ns3::Packet> packet) [member function]
-    cls.add_method('SendPacketDone', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::Packet >', 'packet')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetAddress(ns3::Mac48Address addr) [member function]
-    cls.add_method('SetAddress', 
-                   'void', 
-                   [param('ns3::Mac48Address', 'addr')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetCwMin(uint32_t cw) [member function]
-    cls.add_method('SetCwMin', 
-                   'void', 
-                   [param('uint32_t', 'cw')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
-    cls.add_method('SetDevice', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetForwardUpCb(ns3::Callback<void, ns3::Ptr<ns3::Packet>, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty> cb) [member function]
-    cls.add_method('SetForwardUpCb', 
-                   'void', 
-                   [param('ns3::Callback< void, ns3::Ptr< ns3::Packet >, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty >', 'cb')], 
-                   is_pure_virtual=True, is_virtual=True)
-    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
-    cls.add_method('SetRemoteStationManager', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')], 
-                   is_pure_virtual=True, is_virtual=True)
-    return
-
-def register_Ns3RescueMacCsma_methods(root_module, cls):
-    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma::RescueMacCsma(ns3::RescueMacCsma const & arg0) [copy constructor]
-    cls.add_constructor([param('ns3::RescueMacCsma const &', 'arg0')])
-    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma::RescueMacCsma() [constructor]
-    cls.add_constructor([])
-    ## rescue-mac-csma.h (module 'rescue'): int64_t ns3::RescueMacCsma::AssignStreams(int64_t stream) [member function]
-    cls.add_method('AssignStreams', 
-                   'int64_t', 
-                   [param('int64_t', 'stream')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::AttachPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
-    cls.add_method('AttachPhy', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::Clear() [member function]
-    cls.add_method('Clear', 
-                   'void', 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Ptr<ns3::RescueMacCsma> ns3::RescueMac::GetCsmaMac() const [member function]
+    cls.add_method('GetCsmaMac', 
+                   'ns3::Ptr< ns3::RescueMacCsma >', 
                    [], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
-    cls.add_method('Enqueue', 
-                   'bool', 
-                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): ns3::Mac48Address ns3::RescueMacCsma::GetAddress() const [member function]
-    cls.add_method('GetAddress', 
-                   'ns3::Mac48Address', 
-                   [], 
-                   is_const=True, is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): ns3::Mac48Address ns3::RescueMacCsma::GetBroadcast() const [member function]
-    cls.add_method('GetBroadcast', 
-                   'ns3::Mac48Address', 
-                   [], 
-                   is_const=True, is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): uint32_t ns3::RescueMacCsma::GetCw() [member function]
-    cls.add_method('GetCw', 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): uint32_t ns3::RescueMac::GetCwMax() const [member function]
+    cls.add_method('GetCwMax', 
                    'uint32_t', 
                    [], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): ns3::Time ns3::RescueMacCsma::GetSlotTime() [member function]
-    cls.add_method('GetSlotTime', 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): uint32_t ns3::RescueMac::GetCwMin() const [member function]
+    cls.add_method('GetCwMin', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Time ns3::RescueMac::GetLifs() const [member function]
+    cls.add_method('GetLifs', 
                    'ns3::Time', 
                    [], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): static ns3::TypeId ns3::RescueMacCsma::GetTypeId() [member function]
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): uint32_t ns3::RescueMac::GetQueueLimits() const [member function]
+    cls.add_method('GetQueueLimits', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Time ns3::RescueMac::GetSifs() const [member function]
+    cls.add_method('GetSifs', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Time ns3::RescueMac::GetSlot() const [member function]
+    cls.add_method('GetSlot', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): ns3::Ptr<ns3::RescueMacTdma> ns3::RescueMac::GetTdmaMac() const [member function]
+    cls.add_method('GetTdmaMac', 
+                   'ns3::Ptr< ns3::RescueMacTdma >', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac.h (module 'rescue'): static ns3::TypeId ns3::RescueMac::GetTypeId() [member function]
     cls.add_method('GetTypeId', 
                    'ns3::TypeId', 
                    [], 
                    is_static=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::ReceivePacket(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt) [member function]
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::ReceiveBeacon(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveBeacon', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::ReceivePacket(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
     cls.add_method('ReceivePacket', 
                    'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt')], 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
                    is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::ReceivePacketDone(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr, double snr, ns3::RescueMode mode, bool correctPhyHdr, bool correctData, bool wasReconstructed) [member function]
-    cls.add_method('ReceivePacketDone', 
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::ReceiveResourceReservation(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveResourceReservation', 
                    'void', 
-                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr'), param('double', 'snr'), param('ns3::RescueMode', 'mode'), param('bool', 'correctPhyHdr'), param('bool', 'correctData'), param('bool', 'wasReconstructed')], 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
                    is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SendPacketDone(ns3::Ptr<ns3::Packet> pkt) [member function]
-    cls.add_method('SendPacketDone', 
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::RxOk(ns3::Ptr<const ns3::Packet> pkt, ns3::RescuePhyHeader const & hdr) [member function]
+    cls.add_method('RxOk', 
                    'void', 
-                   [param('ns3::Ptr< ns3::Packet >', 'pkt')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetAddress(ns3::Mac48Address addr) [member function]
+                   [param('ns3::Ptr< ns3::Packet const >', 'pkt'), param('ns3::RescuePhyHeader const &', 'hdr')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetAddress(ns3::Mac48Address addr) [member function]
     cls.add_method('SetAddress', 
                    'void', 
-                   [param('ns3::Mac48Address', 'addr')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetCwMin(uint32_t cw) [member function]
+                   [param('ns3::Mac48Address', 'addr')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetBasicAckTimeout(ns3::Time duration) [member function]
+    cls.add_method('SetBasicAckTimeout', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetCwMax(uint32_t cw) [member function]
+    cls.add_method('SetCwMax', 
+                   'void', 
+                   [param('uint32_t', 'cw')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetCwMin(uint32_t cw) [member function]
     cls.add_method('SetCwMin', 
                    'void', 
-                   [param('uint32_t', 'cw')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
+                   [param('uint32_t', 'cw')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
     cls.add_method('SetDevice', 
                    'void', 
-                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetForwardUpCb(ns3::Callback<void, ns3::Ptr<ns3::Packet>, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty> cb) [member function]
+                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetForwardUpCb(ns3::Callback<void, ns3::Ptr<ns3::Packet>, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty> cb) [member function]
     cls.add_method('SetForwardUpCb', 
                    'void', 
-                   [param('ns3::Callback< void, ns3::Ptr< ns3::Packet >, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty >', 'cb')], 
-                   is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
+                   [param('ns3::Callback< void, ns3::Ptr< ns3::Packet >, ns3::Mac48Address, ns3::Mac48Address, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty, ns3::empty >', 'cb')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetLifs(ns3::Time duration) [member function]
+    cls.add_method('SetLifs', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetQueueLimits(uint32_t length) [member function]
+    cls.add_method('SetQueueLimits', 
+                   'void', 
+                   [param('uint32_t', 'length')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
     cls.add_method('SetRemoteStationManager', 
                    'void', 
-                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')], 
+                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetSifs(ns3::Time duration) [member function]
+    cls.add_method('SetSifs', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetSlot(ns3::Time duration) [member function]
+    cls.add_method('SetSlot', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::SetTypeOfStation(ns3::StationType type) [member function]
+    cls.add_method('SetTypeOfStation', 
+                   'void', 
+                   [param('ns3::StationType', 'type')])
+    ## rescue-mac.h (module 'rescue'): bool ns3::RescueMac::ShouldBeForwarded(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ShouldBeForwarded', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
                    is_virtual=True)
-    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetSlotTime(ns3::Time duration) [member function]
-    cls.add_method('SetSlotTime', 
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::DoDispose() [member function]
+    cls.add_method('DoDispose', 
                    'void', 
-                   [param('ns3::Time', 'duration')], 
-                   is_virtual=True)
-    return
-
-def register_Ns3RescueMacCsmaHelper_methods(root_module, cls):
-    ## rescue-mac-csma-helper.h (module 'rescue'): ns3::RescueMacCsmaHelper::RescueMacCsmaHelper(ns3::RescueMacCsmaHelper const & arg0) [copy constructor]
-    cls.add_constructor([param('ns3::RescueMacCsmaHelper const &', 'arg0')])
-    ## rescue-mac-csma-helper.h (module 'rescue'): ns3::RescueMacCsmaHelper::RescueMacCsmaHelper() [constructor]
-    cls.add_constructor([])
-    ## rescue-mac-csma-helper.h (module 'rescue'): static ns3::RescueMacCsmaHelper ns3::RescueMacCsmaHelper::Default() [member function]
-    cls.add_method('Default', 
-                   'ns3::RescueMacCsmaHelper', 
                    [], 
-                   is_static=True)
-    ## rescue-mac-csma-helper.h (module 'rescue'): void ns3::RescueMacCsmaHelper::Set(std::string n="", ns3::AttributeValue const & v=ns3::EmptyAttributeValue()) [member function]
-    cls.add_method('Set', 
+                   visibility='protected', is_virtual=True)
+    ## rescue-mac.h (module 'rescue'): void ns3::RescueMac::DoInitialize() [member function]
+    cls.add_method('DoInitialize', 
                    'void', 
-                   [param('std::string', 'n', default_value='""'), param('ns3::AttributeValue const &', 'v', default_value='ns3::EmptyAttributeValue()')])
-    ## rescue-mac-csma-helper.h (module 'rescue'): void ns3::RescueMacCsmaHelper::SetType(std::string type, std::string n0="", ns3::AttributeValue const & v0=ns3::EmptyAttributeValue(), std::string n1="", ns3::AttributeValue const & v1=ns3::EmptyAttributeValue(), std::string n2="", ns3::AttributeValue const & v2=ns3::EmptyAttributeValue(), std::string n3="", ns3::AttributeValue const & v3=ns3::EmptyAttributeValue(), std::string n4="", ns3::AttributeValue const & v4=ns3::EmptyAttributeValue(), std::string n5="", ns3::AttributeValue const & v5=ns3::EmptyAttributeValue(), std::string n6="", ns3::AttributeValue const & v6=ns3::EmptyAttributeValue(), std::string n7="", ns3::AttributeValue const & v7=ns3::EmptyAttributeValue(), std::string n8="", ns3::AttributeValue const & v8=ns3::EmptyAttributeValue(), std::string n9="", ns3::AttributeValue const & v9=ns3::EmptyAttributeValue(), std::string n10="", ns3::AttributeValue const & v10=ns3::EmptyAttributeValue(), std::string n11="", ns3::AttributeValue const & v11=ns3::EmptyAttributeValue(), std::string n12="", ns3::AttributeValue const & v12=ns3::EmptyAttributeValue()) [member function]
-    cls.add_method('SetType', 
-                   'void', 
-                   [param('std::string', 'type'), param('std::string', 'n0', default_value='""'), param('ns3::AttributeValue const &', 'v0', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n1', default_value='""'), param('ns3::AttributeValue const &', 'v1', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n2', default_value='""'), param('ns3::AttributeValue const &', 'v2', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n3', default_value='""'), param('ns3::AttributeValue const &', 'v3', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n4', default_value='""'), param('ns3::AttributeValue const &', 'v4', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n5', default_value='""'), param('ns3::AttributeValue const &', 'v5', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n6', default_value='""'), param('ns3::AttributeValue const &', 'v6', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n7', default_value='""'), param('ns3::AttributeValue const &', 'v7', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n8', default_value='""'), param('ns3::AttributeValue const &', 'v8', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n9', default_value='""'), param('ns3::AttributeValue const &', 'v9', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n10', default_value='""'), param('ns3::AttributeValue const &', 'v10', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n11', default_value='""'), param('ns3::AttributeValue const &', 'v11', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n12', default_value='""'), param('ns3::AttributeValue const &', 'v12', default_value='ns3::EmptyAttributeValue()')])
-    ## rescue-mac-csma-helper.h (module 'rescue'): ns3::Ptr<ns3::RescueMac> ns3::RescueMacCsmaHelper::Create() const [member function]
-    cls.add_method('Create', 
-                   'ns3::Ptr< ns3::RescueMac >', 
                    [], 
-                   is_const=True, visibility='private', is_virtual=True)
+                   visibility='protected', is_virtual=True)
     return
 
 def register_Ns3RescueMacHeader_methods(root_module, cls):
@@ -3586,6 +3622,11 @@ def register_Ns3RescueMacHeader_methods(root_module, cls):
     ## rescue-mac-header.h (module 'rescue'): ns3::Mac48Address ns3::RescueMacHeader::GetDestination() const [member function]
     cls.add_method('GetDestination', 
                    'ns3::Mac48Address', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-header.h (module 'rescue'): uint8_t ns3::RescueMacHeader::GetFrameControl() const [member function]
+    cls.add_method('GetFrameControl', 
+                   'uint8_t', 
                    [], 
                    is_const=True)
     ## rescue-mac-header.h (module 'rescue'): ns3::TypeId ns3::RescueMacHeader::GetInstanceTypeId() const [member function]
@@ -3623,6 +3664,11 @@ def register_Ns3RescueMacHeader_methods(root_module, cls):
                    'ns3::TypeId', 
                    [], 
                    is_static=True)
+    ## rescue-mac-header.h (module 'rescue'): bool ns3::RescueMacHeader::IsRetry() const [member function]
+    cls.add_method('IsRetry', 
+                   'bool', 
+                   [], 
+                   is_const=True)
     ## rescue-mac-header.h (module 'rescue'): void ns3::RescueMacHeader::Print(std::ostream & os) const [member function]
     cls.add_method('Print', 
                    'void', 
@@ -3637,6 +3683,18 @@ def register_Ns3RescueMacHeader_methods(root_module, cls):
     cls.add_method('SetDestination', 
                    'void', 
                    [param('ns3::Mac48Address', 'addr')])
+    ## rescue-mac-header.h (module 'rescue'): void ns3::RescueMacHeader::SetFrameControl(uint8_t ctrl) [member function]
+    cls.add_method('SetFrameControl', 
+                   'void', 
+                   [param('uint8_t', 'ctrl')])
+    ## rescue-mac-header.h (module 'rescue'): void ns3::RescueMacHeader::SetNoRetry() [member function]
+    cls.add_method('SetNoRetry', 
+                   'void', 
+                   [])
+    ## rescue-mac-header.h (module 'rescue'): void ns3::RescueMacHeader::SetRetry() [member function]
+    cls.add_method('SetRetry', 
+                   'void', 
+                   [])
     ## rescue-mac-header.h (module 'rescue'): void ns3::RescueMacHeader::SetSequence(uint16_t seq) [member function]
     cls.add_method('SetSequence', 
                    'void', 
@@ -3649,23 +3707,6 @@ def register_Ns3RescueMacHeader_methods(root_module, cls):
     cls.add_method('SetType', 
                    'void', 
                    [param('uint8_t', 'type')])
-    return
-
-def register_Ns3RescueNistErrorRateModel_methods(root_module, cls):
-    ## rescue-nist-error-rate-model.h (module 'rescue'): ns3::RescueNistErrorRateModel::RescueNistErrorRateModel(ns3::RescueNistErrorRateModel const & arg0) [copy constructor]
-    cls.add_constructor([param('ns3::RescueNistErrorRateModel const &', 'arg0')])
-    ## rescue-nist-error-rate-model.h (module 'rescue'): ns3::RescueNistErrorRateModel::RescueNistErrorRateModel() [constructor]
-    cls.add_constructor([])
-    ## rescue-nist-error-rate-model.h (module 'rescue'): double ns3::RescueNistErrorRateModel::GetChunkSuccessRate(ns3::RescueMode mode, double snr, uint32_t nbits) const [member function]
-    cls.add_method('GetChunkSuccessRate', 
-                   'double', 
-                   [param('ns3::RescueMode', 'mode'), param('double', 'snr'), param('uint32_t', 'nbits')], 
-                   is_const=True, is_virtual=True)
-    ## rescue-nist-error-rate-model.h (module 'rescue'): static ns3::TypeId ns3::RescueNistErrorRateModel::GetTypeId() [member function]
-    cls.add_method('GetTypeId', 
-                   'ns3::TypeId', 
-                   [], 
-                   is_static=True)
     return
 
 def register_Ns3RescuePhy_methods(root_module, cls):
@@ -3697,11 +3738,6 @@ def register_Ns3RescuePhy_methods(root_module, cls):
     cls.add_method('GetDataDuration', 
                    'ns3::Time', 
                    [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescueMode', 'mode')])
-    ## rescue-phy.h (module 'rescue'): ns3::Ptr<ns3::RescueErrorRateModel> ns3::RescuePhy::GetErrorRateModel() const [member function]
-    cls.add_method('GetErrorRateModel', 
-                   'ns3::Ptr< ns3::RescueErrorRateModel >', 
-                   [], 
-                   is_const=True)
     ## rescue-phy.h (module 'rescue'): ns3::RescueMode ns3::RescuePhy::GetMode(uint32_t mode) const [member function]
     cls.add_method('GetMode', 
                    'ns3::RescueMode', 
@@ -3729,6 +3765,11 @@ def register_Ns3RescuePhy_methods(root_module, cls):
                    is_static=True)
     ## rescue-phy.h (module 'rescue'): static ns3::RescueMode ns3::RescuePhy::GetOfdm36Mbps() [member function]
     cls.add_method('GetOfdm36Mbps', 
+                   'ns3::RescueMode', 
+                   [], 
+                   is_static=True)
+    ## rescue-phy.h (module 'rescue'): static ns3::RescueMode ns3::RescuePhy::GetOfdm3Mbps() [member function]
+    cls.add_method('GetOfdm3Mbps', 
                    'ns3::RescueMode', 
                    [], 
                    is_static=True)
@@ -3776,6 +3817,14 @@ def register_Ns3RescuePhy_methods(root_module, cls):
                    'bool', 
                    [param('ns3::RescueMode', 'mode')], 
                    is_const=True)
+    ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::NotifyCFP() [member function]
+    cls.add_method('NotifyCFP', 
+                   'void', 
+                   [])
+    ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::NotifyCP() [member function]
+    cls.add_method('NotifyCP', 
+                   'void', 
+                   [])
     ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::ReceivePacket(ns3::Ptr<ns3::Packet> pkt, ns3::RescueMode mode, ns3::Time txDuration, double_t rxPower) [member function]
     cls.add_method('ReceivePacket', 
                    'void', 
@@ -3804,14 +3853,18 @@ def register_Ns3RescuePhy_methods(root_module, cls):
     cls.add_method('SetDevice', 
                    'void', 
                    [param('ns3::Ptr< ns3::RescueNetDevice >', 'device')])
-    ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::SetErrorRateModel(ns3::Ptr<ns3::RescueErrorRateModel> rate) [member function]
-    cls.add_method('SetErrorRateModel', 
-                   'void', 
-                   [param('ns3::Ptr< ns3::RescueErrorRateModel >', 'rate')])
     ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::SetMac(ns3::Ptr<ns3::RescueMac> mac) [member function]
     cls.add_method('SetMac', 
                    'void', 
                    [param('ns3::Ptr< ns3::RescueMac >', 'mac')])
+    ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::SetMacCsma(ns3::Ptr<ns3::RescueMacCsma> csmaMac) [member function]
+    cls.add_method('SetMacCsma', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMacCsma >', 'csmaMac')])
+    ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::SetMacTdma(ns3::Ptr<ns3::RescueMacTdma> tdmaMac) [member function]
+    cls.add_method('SetMacTdma', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMacTdma >', 'tdmaMac')])
     ## rescue-phy.h (module 'rescue'): void ns3::RescuePhy::SetTxPower(double dBm) [member function]
     cls.add_method('SetTxPower', 
                    'void', 
@@ -3832,10 +3885,6 @@ def register_Ns3RescuePhyBasicHelper_methods(root_module, cls):
     cls.add_method('Set', 
                    'void', 
                    [param('std::string', 'n', default_value='""'), param('ns3::AttributeValue const &', 'v', default_value='ns3::EmptyAttributeValue()')])
-    ## rescue-phy-basic-helper.h (module 'rescue'): void ns3::RescuePhyBasicHelper::SetErrorRateModel(std::string name, std::string n0="", ns3::AttributeValue const & v0=ns3::EmptyAttributeValue(), std::string n1="", ns3::AttributeValue const & v1=ns3::EmptyAttributeValue(), std::string n2="", ns3::AttributeValue const & v2=ns3::EmptyAttributeValue(), std::string n3="", ns3::AttributeValue const & v3=ns3::EmptyAttributeValue(), std::string n4="", ns3::AttributeValue const & v4=ns3::EmptyAttributeValue(), std::string n5="", ns3::AttributeValue const & v5=ns3::EmptyAttributeValue(), std::string n6="", ns3::AttributeValue const & v6=ns3::EmptyAttributeValue(), std::string n7="", ns3::AttributeValue const & v7=ns3::EmptyAttributeValue()) [member function]
-    cls.add_method('SetErrorRateModel', 
-                   'void', 
-                   [param('std::string', 'name'), param('std::string', 'n0', default_value='""'), param('ns3::AttributeValue const &', 'v0', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n1', default_value='""'), param('ns3::AttributeValue const &', 'v1', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n2', default_value='""'), param('ns3::AttributeValue const &', 'v2', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n3', default_value='""'), param('ns3::AttributeValue const &', 'v3', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n4', default_value='""'), param('ns3::AttributeValue const &', 'v4', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n5', default_value='""'), param('ns3::AttributeValue const &', 'v5', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n6', default_value='""'), param('ns3::AttributeValue const &', 'v6', default_value='ns3::EmptyAttributeValue()'), param('std::string', 'n7', default_value='""'), param('ns3::AttributeValue const &', 'v7', default_value='ns3::EmptyAttributeValue()')])
     ## rescue-phy-basic-helper.h (module 'rescue'): void ns3::RescuePhyBasicHelper::SetType(std::string type, std::string n0="", ns3::AttributeValue const & v0=ns3::EmptyAttributeValue(), std::string n1="", ns3::AttributeValue const & v1=ns3::EmptyAttributeValue(), std::string n2="", ns3::AttributeValue const & v2=ns3::EmptyAttributeValue(), std::string n3="", ns3::AttributeValue const & v3=ns3::EmptyAttributeValue(), std::string n4="", ns3::AttributeValue const & v4=ns3::EmptyAttributeValue(), std::string n5="", ns3::AttributeValue const & v5=ns3::EmptyAttributeValue(), std::string n6="", ns3::AttributeValue const & v6=ns3::EmptyAttributeValue(), std::string n7="", ns3::AttributeValue const & v7=ns3::EmptyAttributeValue()) [member function]
     cls.add_method('SetType', 
                    'void', 
@@ -3852,21 +3901,51 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
     cls.add_constructor([param('ns3::RescuePhyHeader const &', 'arg0')])
     ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader() [constructor]
     cls.add_constructor([])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(uint8_t type) [constructor]
+    cls.add_constructor([param('uint8_t', 'type')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const dstAddr, uint8_t type) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type')])
     ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const senderAddr, ns3::Mac48Address const dstAddr, uint8_t type) [constructor]
     cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'senderAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type')])
     ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const senderAddr, ns3::Mac48Address const dstAddr, uint8_t type, uint16_t seq, uint16_t il) [constructor]
     cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'senderAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type'), param('uint16_t', 'seq'), param('uint16_t', 'il')])
-    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const dstAddr, uint8_t type) [constructor]
-    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type')])
-    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(uint8_t type) [constructor]
-    cls.add_constructor([param('uint8_t', 'type')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const senderAddr, ns3::Mac48Address const dstAddr, uint8_t type, uint16_t duration, uint16_t seq, uint16_t mbf, uint16_t il) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'senderAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type'), param('uint16_t', 'duration'), param('uint16_t', 'seq'), param('uint16_t', 'mbf'), param('uint16_t', 'il')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const senderAddr, ns3::Mac48Address const dstAddr, uint8_t type, uint16_t duration, uint32_t beaconRep, uint16_t seq, uint16_t mbf, uint16_t il) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'senderAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type'), param('uint16_t', 'duration'), param('uint32_t', 'beaconRep'), param('uint16_t', 'seq'), param('uint16_t', 'mbf'), param('uint16_t', 'il')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const dstAddr, uint8_t type, uint16_t blockAck, uint8_t contAck, uint16_t seq) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type'), param('uint16_t', 'blockAck'), param('uint8_t', 'contAck'), param('uint16_t', 'seq')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, uint8_t type, uint32_t timestamp, uint32_t beaconInterval, uint32_t cfpPeriod, uint32_t tdmaTimeSlot) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('uint8_t', 'type'), param('uint32_t', 'timestamp'), param('uint32_t', 'beaconInterval'), param('uint32_t', 'cfpPeriod'), param('uint32_t', 'tdmaTimeSlot')])
+    ## rescue-phy-header.h (module 'rescue'): ns3::RescuePhyHeader::RescuePhyHeader(ns3::Mac48Address const srcAddr, ns3::Mac48Address const dstAddr, uint8_t type, uint16_t duration, uint16_t nextDuration, uint16_t seq, uint16_t mbf, uint16_t il) [constructor]
+    cls.add_constructor([param('ns3::Mac48Address const', 'srcAddr'), param('ns3::Mac48Address const', 'dstAddr'), param('uint8_t', 'type'), param('uint16_t', 'duration'), param('uint16_t', 'nextDuration'), param('uint16_t', 'seq'), param('uint16_t', 'mbf'), param('uint16_t', 'il')])
     ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::Deserialize(ns3::Buffer::Iterator start) [member function]
     cls.add_method('Deserialize', 
                    'uint32_t', 
                    [param('ns3::Buffer::Iterator', 'start')], 
                    is_virtual=True)
+    ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::GetBeaconInterval() const [member function]
+    cls.add_method('GetBeaconInterval', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::GetBeaconRep() const [member function]
+    cls.add_method('GetBeaconRep', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
     ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetBlockAck() const [member function]
     cls.add_method('GetBlockAck', 
+                   'uint8_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::GetCfpPeriod() const [member function]
+    cls.add_method('GetCfpPeriod', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetChannel() const [member function]
+    cls.add_method('GetChannel', 
                    'uint8_t', 
                    [], 
                    is_const=True)
@@ -3890,9 +3969,14 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
                    'ns3::Mac48Address', 
                    [], 
                    is_const=True)
-    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetFrameControl() const [member function]
-    cls.add_method('GetFrameControl', 
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetDuration() const [member function]
+    cls.add_method('GetDuration', 
                    'uint8_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint16_t ns3::RescuePhyHeader::GetFrameControl() const [member function]
+    cls.add_method('GetFrameControl', 
+                   'uint16_t', 
                    [], 
                    is_const=True)
     ## rescue-phy-header.h (module 'rescue'): ns3::TypeId ns3::RescuePhyHeader::GetInstanceTypeId() const [member function]
@@ -3905,13 +3989,38 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
                    'uint8_t', 
                    [], 
                    is_const=True)
-    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetLength() const [member function]
-    cls.add_method('GetLength', 
+    ## rescue-phy-header.h (module 'rescue'): uint16_t ns3::RescuePhyHeader::GetMBF() const [member function]
+    cls.add_method('GetMBF', 
+                   'uint16_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetNACKedFrames() const [member function]
+    cls.add_method('GetNACKedFrames', 
                    'uint8_t', 
                    [], 
                    is_const=True)
-    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetQoS() const [member function]
-    cls.add_method('GetQoS', 
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetNextDataRate() const [member function]
+    cls.add_method('GetNextDataRate', 
+                   'uint8_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint16_t ns3::RescuePhyHeader::GetNextDuration() const [member function]
+    cls.add_method('GetNextDuration', 
+                   'uint16_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): ns3::Mac48Address ns3::RescuePhyHeader::GetScheduleEntry(uint8_t number) const [member function]
+    cls.add_method('GetScheduleEntry', 
+                   'ns3::Mac48Address', 
+                   [param('uint8_t', 'number')], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetSchedulesListSize() const [member function]
+    cls.add_method('GetSchedulesListSize', 
+                   'uint8_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetSendWindow() const [member function]
+    cls.add_method('GetSendWindow', 
                    'uint8_t', 
                    [], 
                    is_const=True)
@@ -3940,8 +4049,18 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
                    'ns3::Mac48Address', 
                    [], 
                    is_const=True)
-    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetSubtype() const [member function]
-    cls.add_method('GetSubtype', 
+    ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::GetTdmaTimeSlot() const [member function]
+    cls.add_method('GetTdmaTimeSlot', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint32_t ns3::RescuePhyHeader::GetTimestamp() const [member function]
+    cls.add_method('GetTimestamp', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): uint8_t ns3::RescuePhyHeader::GetTxPower() const [member function]
+    cls.add_method('GetTxPower', 
                    'uint8_t', 
                    [], 
                    is_const=True)
@@ -3955,6 +4074,61 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
                    'ns3::TypeId', 
                    [], 
                    is_static=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsACK() const [member function]
+    cls.add_method('IsACK', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsBeaconFrame() const [member function]
+    cls.add_method('IsBeaconFrame', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsBlockAckSupported() const [member function]
+    cls.add_method('IsBlockAckSupported', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsCentralisedMacProtocol() const [member function]
+    cls.add_method('IsCentralisedMacProtocol', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsContinousAckSupported() const [member function]
+    cls.add_method('IsContinousAckSupported', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsDataFrame() const [member function]
+    cls.add_method('IsDataFrame', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsE2eAckFrame() const [member function]
+    cls.add_method('IsE2eAckFrame', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsPartialAckFrame() const [member function]
+    cls.add_method('IsPartialAckFrame', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsQosSupported() const [member function]
+    cls.add_method('IsQosSupported', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsResourceReservationFrame() const [member function]
+    cls.add_method('IsResourceReservationFrame', 
+                   'bool', 
+                   [], 
+                   is_const=True)
+    ## rescue-phy-header.h (module 'rescue'): bool ns3::RescuePhyHeader::IsRetry() const [member function]
+    cls.add_method('IsRetry', 
+                   'bool', 
+                   [], 
+                   is_const=True)
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::Print(std::ostream & os) const [member function]
     cls.add_method('Print', 
                    'void', 
@@ -3965,18 +4139,58 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
                    'void', 
                    [param('ns3::Buffer::Iterator', 'start')], 
                    is_const=True, is_virtual=True)
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBlockAck(uint8_t blockAck) [member function]
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetACK() [member function]
+    cls.add_method('SetACK', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBeaconInterval(uint32_t beaconInterval) [member function]
+    cls.add_method('SetBeaconInterval', 
+                   'void', 
+                   [param('uint32_t', 'beaconInterval')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBeaconRep(uint32_t beaconRep) [member function]
+    cls.add_method('SetBeaconRep', 
+                   'void', 
+                   [param('uint32_t', 'beaconRep')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBlockAck(uint16_t blockAck) [member function]
     cls.add_method('SetBlockAck', 
                    'void', 
-                   [param('uint8_t', 'blockAck')])
+                   [param('uint16_t', 'blockAck')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBlockAckDisabled() [member function]
+    cls.add_method('SetBlockAckDisabled', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetBlockAckSupported() [member function]
+    cls.add_method('SetBlockAckSupported', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetCentralisedMacProtocol() [member function]
+    cls.add_method('SetCentralisedMacProtocol', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetCfpPeriod(uint32_t cfpPeriod) [member function]
+    cls.add_method('SetCfpPeriod', 
+                   'void', 
+                   [param('uint32_t', 'cfpPeriod')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetChannel(uint8_t channel) [member function]
+    cls.add_method('SetChannel', 
+                   'void', 
+                   [param('uint8_t', 'channel')])
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetChecksum(uint32_t checksum) [member function]
     cls.add_method('SetChecksum', 
                    'void', 
                    [param('uint32_t', 'checksum')])
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetContinousAck(uint16_t continousAck) [member function]
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetContinousAck(uint8_t continousAck) [member function]
     cls.add_method('SetContinousAck', 
                    'void', 
-                   [param('uint16_t', 'continousAck')])
+                   [param('uint8_t', 'continousAck')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetContinousAckDisabled() [member function]
+    cls.add_method('SetContinousAckDisabled', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetContinousAckSupported() [member function]
+    cls.add_method('SetContinousAckSupported', 
+                   'void', 
+                   [])
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetDataRate(uint8_t dataRate) [member function]
     cls.add_method('SetDataRate', 
                    'void', 
@@ -3985,22 +4199,70 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
     cls.add_method('SetDestination', 
                    'void', 
                    [param('ns3::Mac48Address', 'addr')])
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetFrameControl(uint8_t ctrl) [member function]
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetDistributedMacProtocol() [member function]
+    cls.add_method('SetDistributedMacProtocol', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetDuration(uint16_t duration) [member function]
+    cls.add_method('SetDuration', 
+                   'void', 
+                   [param('uint16_t', 'duration')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetFrameControl(uint16_t ctrl) [member function]
     cls.add_method('SetFrameControl', 
                    'void', 
-                   [param('uint8_t', 'ctrl')])
+                   [param('uint16_t', 'ctrl')])
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetInterleaver(uint8_t il) [member function]
     cls.add_method('SetInterleaver', 
                    'void', 
                    [param('uint8_t', 'il')])
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetLength(uint8_t length) [member function]
-    cls.add_method('SetLength', 
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetMBF(uint16_t mbf) [member function]
+    cls.add_method('SetMBF', 
                    'void', 
-                   [param('uint8_t', 'length')])
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetQoS(uint8_t qos) [member function]
-    cls.add_method('SetQoS', 
+                   [param('uint16_t', 'mbf')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetNACK() [member function]
+    cls.add_method('SetNACK', 
                    'void', 
-                   [param('uint8_t', 'qos')])
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetNACKedFrames(uint8_t nackedFrames) [member function]
+    cls.add_method('SetNACKedFrames', 
+                   'void', 
+                   [param('uint8_t', 'nackedFrames')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetNextDataRate(uint8_t nextDataRate) [member function]
+    cls.add_method('SetNextDataRate', 
+                   'void', 
+                   [param('uint8_t', 'nextDataRate')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetNextDuration(uint16_t nextDuration) [member function]
+    cls.add_method('SetNextDuration', 
+                   'void', 
+                   [param('uint16_t', 'nextDuration')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetNoRetry() [member function]
+    cls.add_method('SetNoRetry', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetQosDisabled() [member function]
+    cls.add_method('SetQosDisabled', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetQosSupported() [member function]
+    cls.add_method('SetQosSupported', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetRetry() [member function]
+    cls.add_method('SetRetry', 
+                   'void', 
+                   [])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetScheduleEntry(uint8_t number, ns3::Mac48Address scheduleEntry) [member function]
+    cls.add_method('SetScheduleEntry', 
+                   'void', 
+                   [param('uint8_t', 'number'), param('ns3::Mac48Address', 'scheduleEntry')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetSchedulesListSize(uint8_t schedListSize) [member function]
+    cls.add_method('SetSchedulesListSize', 
+                   'void', 
+                   [param('uint8_t', 'schedListSize')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetSendWindow(uint8_t sendWindow) [member function]
+    cls.add_method('SetSendWindow', 
+                   'void', 
+                   [param('uint8_t', 'sendWindow')])
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetSender(ns3::Mac48Address addr) [member function]
     cls.add_method('SetSender', 
                    'void', 
@@ -4013,10 +4275,18 @@ def register_Ns3RescuePhyHeader_methods(root_module, cls):
     cls.add_method('SetSource', 
                    'void', 
                    [param('ns3::Mac48Address', 'addr')])
-    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetSubtype(uint8_t subtype) [member function]
-    cls.add_method('SetSubtype', 
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetTdmaTimeSlot(uint32_t tdmaTimeSlot) [member function]
+    cls.add_method('SetTdmaTimeSlot', 
                    'void', 
-                   [param('uint8_t', 'subtype')])
+                   [param('uint32_t', 'tdmaTimeSlot')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetTimestamp(uint32_t timestamp) [member function]
+    cls.add_method('SetTimestamp', 
+                   'void', 
+                   [param('uint32_t', 'timestamp')])
+    ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetTxPower(uint8_t txPower) [member function]
+    cls.add_method('SetTxPower', 
+                   'void', 
+                   [param('uint8_t', 'txPower')])
     ## rescue-phy-header.h (module 'rescue'): void ns3::RescuePhyHeader::SetType(uint8_t type) [member function]
     cls.add_method('SetType', 
                    'void', 
@@ -4036,19 +4306,48 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
     cls.add_method('AddSupportedMode', 
                    'void', 
                    [param('ns3::Mac48Address', 'address'), param('ns3::RescueMode', 'mode')])
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetAckCw(ns3::Mac48Address address) [member function]
+    cls.add_method('GetAckCw', 
+                   'uint32_t', 
+                   [param('ns3::Mac48Address', 'address')])
     ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetAckTxMode(ns3::Mac48Address address, ns3::RescueMode dataMode) [member function]
     cls.add_method('GetAckTxMode', 
                    'ns3::RescueMode', 
                    [param('ns3::Mac48Address', 'address'), param('ns3::RescueMode', 'dataMode')])
+    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetAckTxMode(ns3::Mac48Address address) [member function]
+    cls.add_method('GetAckTxMode', 
+                   'ns3::RescueMode', 
+                   [param('ns3::Mac48Address', 'address')])
+    ## rescue-remote-station-manager.h (module 'rescue'): ns3::Mac48Address ns3::RescueRemoteStationManager::GetAddress() const [member function]
+    cls.add_method('GetAddress', 
+                   'ns3::Mac48Address', 
+                   [], 
+                   is_const=True)
     ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetBasicMode(uint32_t i) const [member function]
     cls.add_method('GetBasicMode', 
                    'ns3::RescueMode', 
                    [param('uint32_t', 'i')], 
                    is_const=True)
-    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetBlockAckTxMode(ns3::Mac48Address address, ns3::RescueMode dataMode) [member function]
-    cls.add_method('GetBlockAckTxMode', 
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetCtrlCw(ns3::Mac48Address address) [member function]
+    cls.add_method('GetCtrlCw', 
+                   'uint32_t', 
+                   [param('ns3::Mac48Address', 'address')])
+    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetCtrlTxMode(ns3::Mac48Address address) [member function]
+    cls.add_method('GetCtrlTxMode', 
                    'ns3::RescueMode', 
-                   [param('ns3::Mac48Address', 'address'), param('ns3::RescueMode', 'dataMode')])
+                   [param('ns3::Mac48Address', 'address')])
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetCwMax() [member function]
+    cls.add_method('GetCwMax', 
+                   'uint32_t', 
+                   [])
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetCwMin() [member function]
+    cls.add_method('GetCwMin', 
+                   'uint32_t', 
+                   [])
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetDataCw(ns3::Mac48Address address, ns3::Ptr<const ns3::Packet> packet, uint32_t fullPacketSize) [member function]
+    cls.add_method('GetDataCw', 
+                   'uint32_t', 
+                   [param('ns3::Mac48Address', 'address'), param('ns3::Ptr< ns3::Packet const >', 'packet'), param('uint32_t', 'fullPacketSize')])
     ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::GetDataTxMode(ns3::Mac48Address address, ns3::Ptr<const ns3::Packet> packet, uint32_t fullPacketSize) [member function]
     cls.add_method('GetDataTxMode', 
                    'ns3::RescueMode', 
@@ -4069,6 +4368,11 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
                    is_const=True)
     ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetNBasicModes() const [member function]
     cls.add_method('GetNBasicModes', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::GetNonUnicastCw() const [member function]
+    cls.add_method('GetNonUnicastCw', 
                    'uint32_t', 
                    [], 
                    is_const=True)
@@ -4143,10 +4447,14 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
     cls.add_method('ReportFinalDataFailed', 
                    'void', 
                    [param('ns3::Mac48Address', 'address')])
-    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::ReportRxOk(ns3::Mac48Address address, double rxSnr, ns3::RescueMode txMode) [member function]
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::ReportRxFail(ns3::Mac48Address senderAddress, ns3::Mac48Address sourceAddress, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
+    cls.add_method('ReportRxFail', 
+                   'void', 
+                   [param('ns3::Mac48Address', 'senderAddress'), param('ns3::Mac48Address', 'sourceAddress'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')])
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::ReportRxOk(ns3::Mac48Address senderAddress, ns3::Mac48Address sourceAddress, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
     cls.add_method('ReportRxOk', 
                    'void', 
-                   [param('ns3::Mac48Address', 'address'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode')])
+                   [param('ns3::Mac48Address', 'senderAddress'), param('ns3::Mac48Address', 'sourceAddress'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')])
     ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::Reset() [member function]
     cls.add_method('Reset', 
                    'void', 
@@ -4155,10 +4463,22 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
     cls.add_method('Reset', 
                    'void', 
                    [param('ns3::Mac48Address', 'address')])
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::SetCwMax(uint32_t cw) [member function]
+    cls.add_method('SetCwMax', 
+                   'void', 
+                   [param('uint32_t', 'cw')])
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::SetCwMin(uint32_t cw) [member function]
+    cls.add_method('SetCwMin', 
+                   'void', 
+                   [param('uint32_t', 'cw')])
     ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::SetMaxSrc(uint32_t maxSrc) [member function]
     cls.add_method('SetMaxSrc', 
                    'void', 
                    [param('uint32_t', 'maxSrc')])
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::SetupMac(ns3::Ptr<ns3::RescueMac> mac) [member function]
+    cls.add_method('SetupMac', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMac >', 'mac')])
     ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::SetupPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
     cls.add_method('SetupPhy', 
                    'void', 
@@ -4189,10 +4509,20 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
                    'ns3::RescueMode', 
                    [param('ns3::RescueRemoteStation *', 'station'), param('ns3::RescueMode', 'reqMode')], 
                    is_pure_virtual=True, visibility='private', is_virtual=True)
-    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::DoGetDataTxMode(ns3::RescueRemoteStation * station, uint32_t size) [member function]
+    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::DoGetAckTxMode_(ns3::RescueRemoteStation * station) [member function]
+    cls.add_method('DoGetAckTxMode_', 
+                   'ns3::RescueMode', 
+                   [param('ns3::RescueRemoteStation *', 'station')], 
+                   is_pure_virtual=True, visibility='private', is_virtual=True)
+    ## rescue-remote-station-manager.h (module 'rescue'): uint32_t ns3::RescueRemoteStationManager::DoGetDataCw(ns3::RescueRemoteStation * station, ns3::Ptr<const ns3::Packet> packet, uint32_t size) [member function]
+    cls.add_method('DoGetDataCw', 
+                   'uint32_t', 
+                   [param('ns3::RescueRemoteStation *', 'station'), param('ns3::Ptr< ns3::Packet const >', 'packet'), param('uint32_t', 'size')], 
+                   is_pure_virtual=True, visibility='private', is_virtual=True)
+    ## rescue-remote-station-manager.h (module 'rescue'): ns3::RescueMode ns3::RescueRemoteStationManager::DoGetDataTxMode(ns3::RescueRemoteStation * station, ns3::Ptr<const ns3::Packet> packet, uint32_t size) [member function]
     cls.add_method('DoGetDataTxMode', 
                    'ns3::RescueMode', 
-                   [param('ns3::RescueRemoteStation *', 'station'), param('uint32_t', 'size')], 
+                   [param('ns3::RescueRemoteStation *', 'station'), param('ns3::Ptr< ns3::Packet const >', 'packet'), param('uint32_t', 'size')], 
                    is_pure_virtual=True, visibility='private', is_virtual=True)
     ## rescue-remote-station-manager.h (module 'rescue'): bool ns3::RescueRemoteStationManager::DoNeedDataRetransmission(ns3::RescueRemoteStation * station, ns3::Ptr<const ns3::Packet> packet, bool normally) [member function]
     cls.add_method('DoNeedDataRetransmission', 
@@ -4214,10 +4544,15 @@ def register_Ns3RescueRemoteStationManager_methods(root_module, cls):
                    'void', 
                    [param('ns3::RescueRemoteStation *', 'station')], 
                    is_pure_virtual=True, visibility='private', is_virtual=True)
-    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::DoReportRxOk(ns3::RescueRemoteStation * station, double rxSnr, ns3::RescueMode txMode) [member function]
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::DoReportRxFail(ns3::RescueRemoteStation * senderStation, ns3::RescueRemoteStation * sourceStation, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
+    cls.add_method('DoReportRxFail', 
+                   'void', 
+                   [param('ns3::RescueRemoteStation *', 'senderStation'), param('ns3::RescueRemoteStation *', 'sourceStation'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')], 
+                   is_pure_virtual=True, visibility='private', is_virtual=True)
+    ## rescue-remote-station-manager.h (module 'rescue'): void ns3::RescueRemoteStationManager::DoReportRxOk(ns3::RescueRemoteStation * senderStation, ns3::RescueRemoteStation * sourceStation, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
     cls.add_method('DoReportRxOk', 
                    'void', 
-                   [param('ns3::RescueRemoteStation *', 'station'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode')], 
+                   [param('ns3::RescueRemoteStation *', 'senderStation'), param('ns3::RescueRemoteStation *', 'sourceStation'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')], 
                    is_pure_virtual=True, visibility='private', is_virtual=True)
     ## rescue-remote-station-manager.h (module 'rescue'): bool ns3::RescueRemoteStationManager::IsLowLatency() const [member function]
     cls.add_method('IsLowLatency', 
@@ -4415,23 +4750,23 @@ def register_Ns3SnrPerTag_methods(root_module, cls):
     cls.add_constructor([param('ns3::SnrPerTag const &', 'arg0')])
     ## snr-per-tag.h (module 'rescue'): ns3::SnrPerTag::SnrPerTag() [constructor]
     cls.add_constructor([])
-    ## snr-per-tag.h (module 'rescue'): ns3::SnrPerTag::SnrPerTag(double snr, double per) [constructor]
-    cls.add_constructor([param('double', 'snr'), param('double', 'per')])
+    ## snr-per-tag.h (module 'rescue'): ns3::SnrPerTag::SnrPerTag(double snr, double ber) [constructor]
+    cls.add_constructor([param('double', 'snr'), param('double', 'ber')])
     ## snr-per-tag.h (module 'rescue'): void ns3::SnrPerTag::Deserialize(ns3::TagBuffer i) [member function]
     cls.add_method('Deserialize', 
                    'void', 
                    [param('ns3::TagBuffer', 'i')], 
                    is_virtual=True)
+    ## snr-per-tag.h (module 'rescue'): double ns3::SnrPerTag::GetBER() const [member function]
+    cls.add_method('GetBER', 
+                   'double', 
+                   [], 
+                   is_const=True)
     ## snr-per-tag.h (module 'rescue'): ns3::TypeId ns3::SnrPerTag::GetInstanceTypeId() const [member function]
     cls.add_method('GetInstanceTypeId', 
                    'ns3::TypeId', 
                    [], 
                    is_const=True, is_virtual=True)
-    ## snr-per-tag.h (module 'rescue'): double ns3::SnrPerTag::GetPER() const [member function]
-    cls.add_method('GetPER', 
-                   'double', 
-                   [], 
-                   is_const=True)
     ## snr-per-tag.h (module 'rescue'): double ns3::SnrPerTag::GetSNR() const [member function]
     cls.add_method('GetSNR', 
                    'double', 
@@ -4457,10 +4792,10 @@ def register_Ns3SnrPerTag_methods(root_module, cls):
                    'void', 
                    [param('ns3::TagBuffer', 'i')], 
                    is_const=True, is_virtual=True)
-    ## snr-per-tag.h (module 'rescue'): void ns3::SnrPerTag::SetPER(double per) [member function]
-    cls.add_method('SetPER', 
+    ## snr-per-tag.h (module 'rescue'): void ns3::SnrPerTag::SetBER(double ber) [member function]
+    cls.add_method('SetBER', 
                    'void', 
-                   [param('double', 'per')])
+                   [param('double', 'ber')])
     ## snr-per-tag.h (module 'rescue'): void ns3::SnrPerTag::SetSNR(double snr) [member function]
     cls.add_method('SetSNR', 
                    'void', 
@@ -5078,6 +5413,48 @@ def register_Ns3SocketSetDontFragmentTag_methods(root_module, cls):
                    is_const=True, is_virtual=True)
     return
 
+def register_Ns3StaRescueMac_methods(root_module, cls):
+    ## sta-rescue-mac.h (module 'rescue'): ns3::StaRescueMac::StaRescueMac(ns3::StaRescueMac const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::StaRescueMac const &', 'arg0')])
+    ## sta-rescue-mac.h (module 'rescue'): ns3::StaRescueMac::StaRescueMac() [constructor]
+    cls.add_constructor([])
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_virtual=True)
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_virtual=True)
+    ## sta-rescue-mac.h (module 'rescue'): static ns3::TypeId ns3::StaRescueMac::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::ReceiveBeacon(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveBeacon', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::ReceivePacket(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::ReceiveResourceReservation(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveResourceReservation', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## sta-rescue-mac.h (module 'rescue'): void ns3::StaRescueMac::DoInitialize() [member function]
+    cls.add_method('DoInitialize', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    return
+
 def register_Ns3ThreeLogDistancePropagationLossModel_methods(root_module, cls):
     ## propagation-loss-model.h (module 'propagation'): static ns3::TypeId ns3::ThreeLogDistancePropagationLossModel::GetTypeId() [member function]
     cls.add_method('GetTypeId', 
@@ -5099,17 +5476,17 @@ def register_Ns3ThreeLogDistancePropagationLossModel_methods(root_module, cls):
     return
 
 def register_Ns3Time_methods(root_module, cls):
+    cls.add_binary_comparison_operator('<=')
+    cls.add_binary_comparison_operator('!=')
+    cls.add_inplace_numeric_operator('+=', param('ns3::Time const &', u'right'))
     cls.add_binary_numeric_operator('*', root_module['ns3::Time'], root_module['ns3::Time'], param('int64_t const &', u'right'))
     cls.add_binary_numeric_operator('+', root_module['ns3::Time'], root_module['ns3::Time'], param('ns3::Time const &', u'right'))
     cls.add_binary_numeric_operator('-', root_module['ns3::Time'], root_module['ns3::Time'], param('ns3::Time const &', u'right'))
     cls.add_binary_numeric_operator('/', root_module['ns3::Time'], root_module['ns3::Time'], param('int64_t const &', u'right'))
     cls.add_binary_comparison_operator('<')
     cls.add_binary_comparison_operator('>')
-    cls.add_binary_comparison_operator('!=')
-    cls.add_inplace_numeric_operator('+=', param('ns3::Time const &', u'right'))
     cls.add_inplace_numeric_operator('-=', param('ns3::Time const &', u'right'))
     cls.add_output_stream_operator()
-    cls.add_binary_comparison_operator('<=')
     cls.add_binary_comparison_operator('==')
     cls.add_binary_comparison_operator('>=')
     ## nstime.h (module 'core'): ns3::Time::Time() [constructor]
@@ -5602,6 +5979,90 @@ def register_Ns3ZipfRandomVariable_methods(root_module, cls):
                    is_virtual=True)
     return
 
+def register_Ns3AdhocRescueMac_methods(root_module, cls):
+    ## adhoc-rescue-mac.h (module 'rescue'): ns3::AdhocRescueMac::AdhocRescueMac(ns3::AdhocRescueMac const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::AdhocRescueMac const &', 'arg0')])
+    ## adhoc-rescue-mac.h (module 'rescue'): ns3::AdhocRescueMac::AdhocRescueMac() [constructor]
+    cls.add_constructor([])
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_virtual=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_virtual=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): static ns3::TypeId ns3::AdhocRescueMac::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::ReceiveBeacon(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveBeacon', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::ReceivePacket(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::ReceiveResourceReservation(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveResourceReservation', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## adhoc-rescue-mac.h (module 'rescue'): void ns3::AdhocRescueMac::DoInitialize() [member function]
+    cls.add_method('DoInitialize', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    return
+
+def register_Ns3ApRescueMac_methods(root_module, cls):
+    ## ap-rescue-mac.h (module 'rescue'): ns3::ApRescueMac::ApRescueMac(ns3::ApRescueMac const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::ApRescueMac const &', 'arg0')])
+    ## ap-rescue-mac.h (module 'rescue'): ns3::ApRescueMac::ApRescueMac() [constructor]
+    cls.add_constructor([])
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_virtual=True)
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_virtual=True)
+    ## ap-rescue-mac.h (module 'rescue'): static ns3::TypeId ns3::ApRescueMac::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::ReceiveBeacon(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveBeacon', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::ReceivePacket(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::ReceiveResourceReservation(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('ReceiveResourceReservation', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## ap-rescue-mac.h (module 'rescue'): void ns3::ApRescueMac::DoInitialize() [member function]
+    cls.add_method('DoInitialize', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    return
+
 def register_Ns3AttributeAccessor_methods(root_module, cls):
     ## attribute.h (module 'core'): ns3::AttributeAccessor::AttributeAccessor(ns3::AttributeAccessor const & arg0) [copy constructor]
     cls.add_constructor([param('ns3::AttributeAccessor const &', 'arg0')])
@@ -5693,17 +6154,89 @@ def register_Ns3AttributeValue_methods(root_module, cls):
                    is_pure_virtual=True, is_const=True, is_virtual=True)
     return
 
-def register_Ns3BlackBox_methods(root_module, cls):
-    ## blackbox.h (module 'rescue'): ns3::BlackBox::BlackBox(ns3::BlackBox const & arg0) [copy constructor]
-    cls.add_constructor([param('ns3::BlackBox const &', 'arg0')])
-    ## blackbox.h (module 'rescue'): ns3::BlackBox::BlackBox() [constructor]
+def register_Ns3BlackBox_no1_methods(root_module, cls):
+    ## blackbox_no1.h (module 'rescue'): ns3::BlackBox_no1::BlackBox_no1(ns3::BlackBox_no1 const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::BlackBox_no1 const &', 'arg0')])
+    ## blackbox_no1.h (module 'rescue'): ns3::BlackBox_no1::BlackBox_no1() [constructor]
     cls.add_constructor([])
-    ## blackbox.h (module 'rescue'): static double ns3::BlackBox::CalculateRescuePER(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkPER, double constellationSize, double spectralEfficiency, int packetLength) [member function]
-    cls.add_method('CalculateRescuePER', 
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::BERtoPER(double ber, int packetLength) [member function]
+    cls.add_method('BERtoPER', 
                    'double', 
-                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkPER'), param('double', 'constellationSize'), param('double', 'spectralEfficiency'), param('int', 'packetLength')], 
+                   [param('double', 'ber'), param('int', 'packetLength')], 
                    is_static=True)
-    ## blackbox.h (module 'rescue'): static ns3::TypeId ns3::BlackBox::GetTypeId() [member function]
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::BinaryConvolution(double p1, double p2, int packetLength) [member function]
+    cls.add_method('BinaryConvolution', 
+                   'double', 
+                   [param('double', 'p1'), param('double', 'p2'), param('int', 'packetLength')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, int constellationSize, double spectralEfficiency) [member function]
+    cls.add_method('CalculateRescueBitErrorRate', 
+                   'double', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('int', 'constellationSize'), param('double', 'spectralEfficiency')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static void ns3::BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, int constellationSize, double spectralEfficiency, ns3::OutputBlackBox_no1 & outbl_no1) [member function]
+    cls.add_method('CalculateRescueBitErrorRate', 
+                   'void', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('int', 'constellationSize'), param('double', 'spectralEfficiency'), param('ns3::OutputBlackBox_no1 &', 'outbl_no1')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, std::vector<int, std::allocator<int> > constellationSize, std::vector<double, std::allocator<double> > spectralEfficiency) [member function]
+    cls.add_method('CalculateRescueBitErrorRate', 
+                   'double', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('std::vector< int >', 'constellationSize'), param('std::vector< double >', 'spectralEfficiency')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static void ns3::BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, std::vector<int, std::allocator<int> > constellationSize, std::vector<double, std::allocator<double> > spectralEfficiency, ns3::OutputBlackBox_no1 & outbl_no1) [member function]
+    cls.add_method('CalculateRescueBitErrorRate', 
+                   'void', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('std::vector< int >', 'constellationSize'), param('std::vector< double >', 'spectralEfficiency'), param('ns3::OutputBlackBox_no1 &', 'outbl_no1')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::CalculateRescuePacketErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkPacketER, int constellationSize, double spectralEfficiency, int packetLength) [member function]
+    cls.add_method('CalculateRescuePacketErrorRate', 
+                   'double', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkPacketER'), param('int', 'constellationSize'), param('double', 'spectralEfficiency'), param('int', 'packetLength')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::CalculateRescuePacketErrorRate(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, std::vector<int, std::allocator<int> > constellationSize, std::vector<double, std::allocator<double> > spectralEfficiency, int packetLength) [member function]
+    cls.add_method('CalculateRescuePacketErrorRate', 
+                   'double', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('std::vector< int >', 'constellationSize'), param('std::vector< double >', 'spectralEfficiency'), param('int', 'packetLength')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static ns3::TypeId ns3::BlackBox_no1::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static std::vector<double, std::allocator<double> > ns3::BlackBox_no1::PERtoBER(std::vector<double, std::allocator<double> > linkPER, int packetLength) [member function]
+    cls.add_method('PERtoBER', 
+                   'std::vector< double >', 
+                   [param('std::vector< double >', 'linkPER'), param('int', 'packetLength')], 
+                   is_static=True)
+    ## blackbox_no1.h (module 'rescue'): static double ns3::BlackBox_no1::PERtoBER(double per, int packetLength) [member function]
+    cls.add_method('PERtoBER', 
+                   'double', 
+                   [param('double', 'per'), param('int', 'packetLength')], 
+                   is_static=True)
+    return
+
+def register_Ns3BlackBox_no2_methods(root_module, cls):
+    ## blackbox_no2.h (module 'rescue'): ns3::BlackBox_no2::BlackBox_no2(ns3::BlackBox_no2 const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::BlackBox_no2 const &', 'arg0')])
+    ## blackbox_no2.h (module 'rescue'): ns3::BlackBox_no2::BlackBox_no2() [constructor]
+    cls.add_constructor([])
+    ## blackbox_no2.h (module 'rescue'): static int ns3::BlackBox_no2::CalculateRescueBitErrorNumber(double MI, double p_floor, int n_link, int constellationSize) [member function]
+    cls.add_method('CalculateRescueBitErrorNumber', 
+                   'int', 
+                   [param('double', 'MI'), param('double', 'p_floor'), param('int', 'n_link'), param('int', 'constellationSize')], 
+                   is_static=True)
+    ## blackbox_no2.h (module 'rescue'): static int ns3::BlackBox_no2::CalculateRescueBitErrorNumber(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, int constellationSize, double spectralEfficiency) [member function]
+    cls.add_method('CalculateRescueBitErrorNumber', 
+                   'int', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('int', 'constellationSize'), param('double', 'spectralEfficiency')], 
+                   is_static=True)
+    ## blackbox_no2.h (module 'rescue'): static int ns3::BlackBox_no2::CalculateRescueBitErrorNumber(std::vector<double, std::allocator<double> > snr_db, std::vector<double, std::allocator<double> > linkBitER, std::vector<int, std::allocator<int> > linkConstellationSize, std::vector<double, std::allocator<double> > linkSpectralEfficiency) [member function]
+    cls.add_method('CalculateRescueBitErrorNumber', 
+                   'int', 
+                   [param('std::vector< double >', 'snr_db'), param('std::vector< double >', 'linkBitER'), param('std::vector< int >', 'linkConstellationSize'), param('std::vector< double >', 'linkSpectralEfficiency')], 
+                   is_static=True)
+    ## blackbox_no2.h (module 'rescue'): static ns3::TypeId ns3::BlackBox_no2::GetTypeId() [member function]
     cls.add_method('GetTypeId', 
                    'ns3::TypeId', 
                    [], 
@@ -5873,15 +6406,30 @@ def register_Ns3ConstantRateRescueManager_methods(root_module, cls):
                    'ns3::RescueRemoteStation *', 
                    [], 
                    is_const=True, visibility='private', is_virtual=True)
+    ## constant-rate-rescue-manager.h (module 'rescue'): uint32_t ns3::ConstantRateRescueManager::DoGetAckCw(ns3::RescueRemoteStation * station) [member function]
+    cls.add_method('DoGetAckCw', 
+                   'uint32_t', 
+                   [param('ns3::RescueRemoteStation *', 'station')], 
+                   visibility='private', is_virtual=True)
     ## constant-rate-rescue-manager.h (module 'rescue'): ns3::RescueMode ns3::ConstantRateRescueManager::DoGetAckTxMode(ns3::RescueRemoteStation * station, ns3::RescueMode reqMode) [member function]
     cls.add_method('DoGetAckTxMode', 
                    'ns3::RescueMode', 
                    [param('ns3::RescueRemoteStation *', 'station'), param('ns3::RescueMode', 'reqMode')], 
                    visibility='private', is_virtual=True)
-    ## constant-rate-rescue-manager.h (module 'rescue'): ns3::RescueMode ns3::ConstantRateRescueManager::DoGetDataTxMode(ns3::RescueRemoteStation * station, uint32_t size) [member function]
+    ## constant-rate-rescue-manager.h (module 'rescue'): ns3::RescueMode ns3::ConstantRateRescueManager::DoGetAckTxMode_(ns3::RescueRemoteStation * station) [member function]
+    cls.add_method('DoGetAckTxMode_', 
+                   'ns3::RescueMode', 
+                   [param('ns3::RescueRemoteStation *', 'station')], 
+                   visibility='private', is_virtual=True)
+    ## constant-rate-rescue-manager.h (module 'rescue'): uint32_t ns3::ConstantRateRescueManager::DoGetDataCw(ns3::RescueRemoteStation * station, ns3::Ptr<const ns3::Packet> packet, uint32_t size) [member function]
+    cls.add_method('DoGetDataCw', 
+                   'uint32_t', 
+                   [param('ns3::RescueRemoteStation *', 'station'), param('ns3::Ptr< ns3::Packet const >', 'packet'), param('uint32_t', 'size')], 
+                   visibility='private', is_virtual=True)
+    ## constant-rate-rescue-manager.h (module 'rescue'): ns3::RescueMode ns3::ConstantRateRescueManager::DoGetDataTxMode(ns3::RescueRemoteStation * station, ns3::Ptr<const ns3::Packet> packet, uint32_t size) [member function]
     cls.add_method('DoGetDataTxMode', 
                    'ns3::RescueMode', 
-                   [param('ns3::RescueRemoteStation *', 'station'), param('uint32_t', 'size')], 
+                   [param('ns3::RescueRemoteStation *', 'station'), param('ns3::Ptr< ns3::Packet const >', 'packet'), param('uint32_t', 'size')], 
                    visibility='private', is_virtual=True)
     ## constant-rate-rescue-manager.h (module 'rescue'): void ns3::ConstantRateRescueManager::DoReportDataFailed(ns3::RescueRemoteStation * station) [member function]
     cls.add_method('DoReportDataFailed', 
@@ -5898,10 +6446,15 @@ def register_Ns3ConstantRateRescueManager_methods(root_module, cls):
                    'void', 
                    [param('ns3::RescueRemoteStation *', 'station')], 
                    visibility='private', is_virtual=True)
-    ## constant-rate-rescue-manager.h (module 'rescue'): void ns3::ConstantRateRescueManager::DoReportRxOk(ns3::RescueRemoteStation * station, double rxSnr, ns3::RescueMode txMode) [member function]
+    ## constant-rate-rescue-manager.h (module 'rescue'): void ns3::ConstantRateRescueManager::DoReportRxFail(ns3::RescueRemoteStation * senderStation, ns3::RescueRemoteStation * sourceStation, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
+    cls.add_method('DoReportRxFail', 
+                   'void', 
+                   [param('ns3::RescueRemoteStation *', 'senderStation'), param('ns3::RescueRemoteStation *', 'sourceStation'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')], 
+                   visibility='private', is_virtual=True)
+    ## constant-rate-rescue-manager.h (module 'rescue'): void ns3::ConstantRateRescueManager::DoReportRxOk(ns3::RescueRemoteStation * senderStation, ns3::RescueRemoteStation * sourceStation, double rxSnr, ns3::RescueMode txMode, bool wasReconstructed) [member function]
     cls.add_method('DoReportRxOk', 
                    'void', 
-                   [param('ns3::RescueRemoteStation *', 'station'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode')], 
+                   [param('ns3::RescueRemoteStation *', 'senderStation'), param('ns3::RescueRemoteStation *', 'sourceStation'), param('double', 'rxSnr'), param('ns3::RescueMode', 'txMode'), param('bool', 'wasReconstructed')], 
                    visibility='private', is_virtual=True)
     ## constant-rate-rescue-manager.h (module 'rescue'): bool ns3::ConstantRateRescueManager::IsLowLatency() const [member function]
     cls.add_method('IsLowLatency', 
@@ -7145,6 +7698,83 @@ def register_Ns3LogNormalRandomVariable_methods(root_module, cls):
                    is_virtual=True)
     return
 
+def register_Ns3LowRescueMac_methods(root_module, cls):
+    ## low-rescue-mac.h (module 'rescue'): ns3::LowRescueMac::LowRescueMac() [constructor]
+    cls.add_constructor([])
+    ## low-rescue-mac.h (module 'rescue'): ns3::LowRescueMac::LowRescueMac(ns3::LowRescueMac const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::LowRescueMac const &', 'arg0')])
+    ## low-rescue-mac.h (module 'rescue'): int64_t ns3::LowRescueMac::AssignStreams(int64_t stream) [member function]
+    cls.add_method('AssignStreams', 
+                   'int64_t', 
+                   [param('int64_t', 'stream')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::AttachPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
+    cls.add_method('AttachPhy', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): bool ns3::LowRescueMac::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::ReceivePacket(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> packet) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'packet')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::ReceivePacketDone(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr, double snr, ns3::RescueMode mode, bool correctPhyHdr, bool correctData, bool wasReconstructed) [member function]
+    cls.add_method('ReceivePacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr'), param('double', 'snr'), param('ns3::RescueMode', 'mode'), param('bool', 'correctPhyHdr'), param('bool', 'correctData'), param('bool', 'wasReconstructed')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::SendPacketDone(ns3::Ptr<ns3::Packet> packet) [member function]
+    cls.add_method('SendPacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'packet')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
+    cls.add_method('SetDevice', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::SetHiMac(ns3::Ptr<ns3::RescueMac> mac) [member function]
+    cls.add_method('SetHiMac', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMac >', 'mac')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): void ns3::LowRescueMac::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
+    cls.add_method('SetRemoteStationManager', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): bool ns3::LowRescueMac::StartOperation() [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): bool ns3::LowRescueMac::StartOperation(ns3::Time duration) [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): bool ns3::LowRescueMac::StopOperation() [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [], 
+                   is_pure_virtual=True, is_virtual=True)
+    ## low-rescue-mac.h (module 'rescue'): bool ns3::LowRescueMac::StopOperation(ns3::Time duration) [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_pure_virtual=True, is_virtual=True)
+    return
+
 def register_Ns3Mac48AddressChecker_methods(root_module, cls):
     ## mac48-address.h (module 'network'): ns3::Mac48AddressChecker::Mac48AddressChecker() [constructor]
     cls.add_constructor([])
@@ -7931,6 +8561,351 @@ def register_Ns3RescueChannel_methods(root_module, cls):
                    [param('double', 'w')])
     return
 
+def register_Ns3RescueMacCsma_methods(root_module, cls):
+    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma::RescueMacCsma(ns3::RescueMacCsma const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::RescueMacCsma const &', 'arg0')])
+    ## rescue-mac-csma.h (module 'rescue'): ns3::RescueMacCsma::RescueMacCsma() [constructor]
+    cls.add_constructor([])
+    ## rescue-mac-csma.h (module 'rescue'): int64_t ns3::RescueMacCsma::AssignStreams(int64_t stream) [member function]
+    cls.add_method('AssignStreams', 
+                   'int64_t', 
+                   [param('int64_t', 'stream')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::AttachPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
+    cls.add_method('AttachPhy', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::EnqueueCtrl(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('EnqueueCtrl', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): ns3::Time ns3::RescueMacCsma::GetBasicAckTimeout() const [member function]
+    cls.add_method('GetBasicAckTimeout', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): uint32_t ns3::RescueMacCsma::GetCw() const [member function]
+    cls.add_method('GetCw', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): uint32_t ns3::RescueMacCsma::GetCwMax() const [member function]
+    cls.add_method('GetCwMax', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): uint32_t ns3::RescueMacCsma::GetCwMin() const [member function]
+    cls.add_method('GetCwMin', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): ns3::Time ns3::RescueMacCsma::GetLifsTime() const [member function]
+    cls.add_method('GetLifsTime', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): uint32_t ns3::RescueMacCsma::GetQueueLimits() const [member function]
+    cls.add_method('GetQueueLimits', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): ns3::Time ns3::RescueMacCsma::GetSifsTime() const [member function]
+    cls.add_method('GetSifsTime', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): ns3::Time ns3::RescueMacCsma::GetSlotTime() const [member function]
+    cls.add_method('GetSlotTime', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-csma.h (module 'rescue'): static ns3::TypeId ns3::RescueMacCsma::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::ReceivePacket(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::ReceivePacketDone(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr, double snr, ns3::RescueMode mode, bool correctPhyHdr, bool correctData, bool wasReconstructed) [member function]
+    cls.add_method('ReceivePacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr'), param('double', 'snr'), param('ns3::RescueMode', 'mode'), param('bool', 'correctPhyHdr'), param('bool', 'correctData'), param('bool', 'wasReconstructed')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SendPacketDone(ns3::Ptr<ns3::Packet> pkt) [member function]
+    cls.add_method('SendPacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetBasicAckTimeout(ns3::Time duration) [member function]
+    cls.add_method('SetBasicAckTimeout', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetCwMax(uint32_t cw) [member function]
+    cls.add_method('SetCwMax', 
+                   'void', 
+                   [param('uint32_t', 'cw')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetCwMin(uint32_t cw) [member function]
+    cls.add_method('SetCwMin', 
+                   'void', 
+                   [param('uint32_t', 'cw')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
+    cls.add_method('SetDevice', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetHiMac(ns3::Ptr<ns3::RescueMac> hiMac) [member function]
+    cls.add_method('SetHiMac', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMac >', 'hiMac')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetLifsTime(ns3::Time duration) [member function]
+    cls.add_method('SetLifsTime', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetQueueLimits(uint32_t length) [member function]
+    cls.add_method('SetQueueLimits', 
+                   'void', 
+                   [param('uint32_t', 'length')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
+    cls.add_method('SetRemoteStationManager', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetSifsTime(ns3::Time duration) [member function]
+    cls.add_method('SetSifsTime', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::SetSlotTime(ns3::Time duration) [member function]
+    cls.add_method('SetSlotTime', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::StartOperation() [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::StartOperation(ns3::Time duration) [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::StopOperation() [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): bool ns3::RescueMacCsma::StopOperation(ns3::Time duration) [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_virtual=True)
+    ## rescue-mac-csma.h (module 'rescue'): void ns3::RescueMacCsma::DoDispose() [member function]
+    cls.add_method('DoDispose', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    return
+
+def register_Ns3RescueMacTdma_methods(root_module, cls):
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::RescueMacTdma::RescueMacTdma(ns3::RescueMacTdma const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::RescueMacTdma const &', 'arg0')])
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::RescueMacTdma::RescueMacTdma() [constructor]
+    cls.add_constructor([])
+    ## rescue-mac-tdma.h (module 'rescue'): int64_t ns3::RescueMacTdma::AssignStreams(int64_t stream) [member function]
+    cls.add_method('AssignStreams', 
+                   'int64_t', 
+                   [param('int64_t', 'stream')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::AttachPhy(ns3::Ptr<ns3::RescuePhy> phy) [member function]
+    cls.add_method('AttachPhy', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::ChannelAccessGranted() [member function]
+    cls.add_method('ChannelAccessGranted', 
+                   'void', 
+                   [])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::Clear() [member function]
+    cls.add_method('Clear', 
+                   'void', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::Enqueue(ns3::Ptr<ns3::Packet> pkt, ns3::Mac48Address dest) [member function]
+    cls.add_method('Enqueue', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::Mac48Address', 'dest')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::EnqueueCtrl(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('EnqueueCtrl', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::Time ns3::RescueMacTdma::GetBasicAckTimeout() const [member function]
+    cls.add_method('GetBasicAckTimeout', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::Time ns3::RescueMacTdma::GetLifsTime() const [member function]
+    cls.add_method('GetLifsTime', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::Time ns3::RescueMacTdma::GetNextTxSifsDuration() [member function]
+    cls.add_method('GetNextTxSifsDuration', 
+                   'ns3::Time', 
+                   [])
+    ## rescue-mac-tdma.h (module 'rescue'): uint32_t ns3::RescueMacTdma::GetQueueLimits() const [member function]
+    cls.add_method('GetQueueLimits', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-tdma.h (module 'rescue'): ns3::Time ns3::RescueMacTdma::GetSifsTime() const [member function]
+    cls.add_method('GetSifsTime', 
+                   'ns3::Time', 
+                   [], 
+                   is_const=True)
+    ## rescue-mac-tdma.h (module 'rescue'): static ns3::TypeId ns3::RescueMacTdma::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::ReceivePacket(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt) [member function]
+    cls.add_method('ReceivePacket', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::ReceivePacketDone(ns3::Ptr<ns3::RescuePhy> phy, ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr, double snr, ns3::RescueMode mode, bool correctPhyHdr, bool correctData, bool wasReconstructed) [member function]
+    cls.add_method('ReceivePacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescuePhy >', 'phy'), param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr'), param('double', 'snr'), param('ns3::RescueMode', 'mode'), param('bool', 'correctPhyHdr'), param('bool', 'correctData'), param('bool', 'wasReconstructed')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::SendCtrlNow(ns3::Ptr<ns3::Packet> pkt, ns3::RescuePhyHeader phyHdr) [member function]
+    cls.add_method('SendCtrlNow', 
+                   'bool', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt'), param('ns3::RescuePhyHeader', 'phyHdr')])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SendData() [member function]
+    cls.add_method('SendData', 
+                   'void', 
+                   [])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SendPacketDone(ns3::Ptr<ns3::Packet> pkt) [member function]
+    cls.add_method('SendPacketDone', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Packet >', 'pkt')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SendRelayedData() [member function]
+    cls.add_method('SendRelayedData', 
+                   'void', 
+                   [])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetBasicAckTimeout(ns3::Time duration) [member function]
+    cls.add_method('SetBasicAckTimeout', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetDevice(ns3::Ptr<ns3::RescueNetDevice> dev) [member function]
+    cls.add_method('SetDevice', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueNetDevice >', 'dev')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetHiMac(ns3::Ptr<ns3::RescueMac> hiMac) [member function]
+    cls.add_method('SetHiMac', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueMac >', 'hiMac')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetLifsTime(ns3::Time duration) [member function]
+    cls.add_method('SetLifsTime', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetQueueLimits(uint32_t length) [member function]
+    cls.add_method('SetQueueLimits', 
+                   'void', 
+                   [param('uint32_t', 'length')])
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetRemoteStationManager(ns3::Ptr<ns3::RescueRemoteStationManager> manager) [member function]
+    cls.add_method('SetRemoteStationManager', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::RescueRemoteStationManager >', 'manager')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::SetSifsTime(ns3::Time duration) [member function]
+    cls.add_method('SetSifsTime', 
+                   'void', 
+                   [param('ns3::Time', 'duration')])
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::StartOperation() [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::StartOperation(ns3::Time duration) [member function]
+    cls.add_method('StartOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::StopOperation() [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): bool ns3::RescueMacTdma::StopOperation(ns3::Time duration) [member function]
+    cls.add_method('StopOperation', 
+                   'bool', 
+                   [param('ns3::Time', 'duration')], 
+                   is_virtual=True)
+    ## rescue-mac-tdma.h (module 'rescue'): void ns3::RescueMacTdma::DoDispose() [member function]
+    cls.add_method('DoDispose', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    return
+
+def register_Ns3RescueMacTrailer_methods(root_module, cls):
+    ## rescue-mac-trailer.h (module 'rescue'): ns3::RescueMacTrailer::RescueMacTrailer(ns3::RescueMacTrailer const & arg0) [copy constructor]
+    cls.add_constructor([param('ns3::RescueMacTrailer const &', 'arg0')])
+    ## rescue-mac-trailer.h (module 'rescue'): ns3::RescueMacTrailer::RescueMacTrailer() [constructor]
+    cls.add_constructor([])
+    ## rescue-mac-trailer.h (module 'rescue'): uint32_t ns3::RescueMacTrailer::Deserialize(ns3::Buffer::Iterator start) [member function]
+    cls.add_method('Deserialize', 
+                   'uint32_t', 
+                   [param('ns3::Buffer::Iterator', 'start')], 
+                   is_virtual=True)
+    ## rescue-mac-trailer.h (module 'rescue'): ns3::TypeId ns3::RescueMacTrailer::GetInstanceTypeId() const [member function]
+    cls.add_method('GetInstanceTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_const=True, is_virtual=True)
+    ## rescue-mac-trailer.h (module 'rescue'): uint32_t ns3::RescueMacTrailer::GetSerializedSize() const [member function]
+    cls.add_method('GetSerializedSize', 
+                   'uint32_t', 
+                   [], 
+                   is_const=True, is_virtual=True)
+    ## rescue-mac-trailer.h (module 'rescue'): static ns3::TypeId ns3::RescueMacTrailer::GetTypeId() [member function]
+    cls.add_method('GetTypeId', 
+                   'ns3::TypeId', 
+                   [], 
+                   is_static=True)
+    ## rescue-mac-trailer.h (module 'rescue'): void ns3::RescueMacTrailer::Print(std::ostream & os) const [member function]
+    cls.add_method('Print', 
+                   'void', 
+                   [param('std::ostream &', 'os')], 
+                   is_const=True, is_virtual=True)
+    ## rescue-mac-trailer.h (module 'rescue'): void ns3::RescueMacTrailer::Serialize(ns3::Buffer::Iterator start) const [member function]
+    cls.add_method('Serialize', 
+                   'void', 
+                   [param('ns3::Buffer::Iterator', 'start')], 
+                   is_const=True, is_virtual=True)
+    return
+
 def register_Ns3RescueModeChecker_methods(root_module, cls):
     ## rescue-mode.h (module 'rescue'): ns3::RescueModeChecker::RescueModeChecker() [constructor]
     cls.add_constructor([])
@@ -8138,6 +9113,11 @@ def register_Ns3RescueNetDevice_methods(root_module, cls):
                    is_const=True, is_virtual=True)
     ## rescue-net-device.h (module 'rescue'): void ns3::RescueNetDevice::DoDispose() [member function]
     cls.add_method('DoDispose', 
+                   'void', 
+                   [], 
+                   visibility='protected', is_virtual=True)
+    ## rescue-net-device.h (module 'rescue'): void ns3::RescueNetDevice::DoInitialize() [member function]
+    cls.add_method('DoInitialize', 
                    'void', 
                    [], 
                    visibility='protected', is_virtual=True)

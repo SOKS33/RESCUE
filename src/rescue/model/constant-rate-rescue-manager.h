@@ -1,6 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006 INRIA
+ * Copyright (c) 2015 AGH University of Science nad Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -45,19 +46,33 @@ public:
 private:
   // overriden from base class
   virtual RescueRemoteStation* DoCreateStation (void) const;
-  virtual void DoReportRxOk (RescueRemoteStation *station,
-                             double rxSnr, RescueMode txMode);
+  virtual void DoReportRxOk (RescueRemoteStation *senderStation,
+                             RescueRemoteStation *sourceStation,
+                             double rxSnr, RescueMode txMode, bool wasReconstructed);
+  virtual void DoReportRxFail (RescueRemoteStation *senderStation,
+                               RescueRemoteStation *sourceStation,
+                               double rxSnr, RescueMode txMode, bool wasReconstructed);
   virtual void DoReportDataFailed (RescueRemoteStation *station);
   virtual void DoReportDataOk (RescueRemoteStation *station,
                                double ackSnr, RescueMode ackMode, 
                                double dataSnr, double dataPer);
   virtual void DoReportFinalDataFailed (RescueRemoteStation *station);
-  virtual RescueMode DoGetDataTxMode (RescueRemoteStation *station, uint32_t size);
-  virtual RescueMode DoGetAckTxMode (RescueRemoteStation *station, RescueMode reqMode);
+  virtual RescueMode DoGetDataTxMode (RescueRemoteStation *station, 
+                                      Ptr<const Packet> packet, 
+                                      uint32_t size);
+  virtual uint32_t DoGetDataCw (RescueRemoteStation *station, 
+                                Ptr<const Packet> packet, 
+                                uint32_t size);
+  virtual RescueMode DoGetAckTxMode (RescueRemoteStation *station, 
+                                     RescueMode reqMode);
+  virtual RescueMode DoGetAckTxMode_ (RescueRemoteStation *station);
+  virtual uint32_t DoGetAckCw (RescueRemoteStation *station);
   virtual bool IsLowLatency (void) const;
 
   RescueMode m_dataMode; //!< Rescue mode for unicast DATA frames
   RescueMode m_ctlMode; //!< Rescue mode for control frames and ACK
+  uint32_t m_dataCw; //!< Contention window for unicast DATA frames
+  uint32_t m_ctlCw; //!< Contention window for control frames and ACK
 };
 
 } // namespace ns3

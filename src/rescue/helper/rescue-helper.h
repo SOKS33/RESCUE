@@ -1,6 +1,7 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2010 University of Arizona
+ * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as 
@@ -42,6 +43,13 @@ public:
   virtual ~RescueMacHelper ();
   virtual Ptr<RescueMac> Create (void) const = 0;
 };
+
+/*class RescueLowMacHelper
+{
+public:
+  virtual ~RescueLowMacHelper ();
+  virtual Ptr<RescueMac> Create (void) const = 0;
+};*/
 
 class RescuePhyHelper
 {

@@ -74,7 +74,7 @@ if [ ! -d $path/build ] ; then
     echo -e "${default}"
     if [[ $noask -eq 1 || $prompt == "y" || $prompt == "Y" || $prompt == "yes" || $prompt == "Yes" ]] ; then
 	    cd $path
-	    CXXFLAGS="-std=c++0x" ./waf --build-profile=debug --enable-examples --disable-tests --disable-python --enable-modules=rescue,mobility,internet,propagation,applications,flow-monitor configure
+	    CXXFLAGS="-std=c++0x" ./waf --build-profile=debug --enable-examples --disable-tests --disable-python --enable-modules=rescue,mobility,internet,propagation,applications,flow-monitor,wifi configure
         ./waf
     fi
 fi

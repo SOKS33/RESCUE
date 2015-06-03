@@ -30,21 +30,29 @@
 #include "ns3/random-variable-stream.h"
 #include "ns3/mac48-address.h"
 
-#include "rescue-mac.h"
+#include "low-rescue-mac.h"
 #include "rescue-mac-header.h"
-#include "rescue-phy.h"
-#include "rescue-remote-station-manager.h"
+#include "rescue-phy-header.h"
+#include "rescue-mode.h"
 #include "snr-per-tag.h"
 
 #include <list>
+#include <map>
 
 namespace ns3 {
+
+class RescuePhy;
+class RescueChannel;
+class RescueMac;
+class RescueRemoteStationManager;
+class RescueArqManager;
+class RescueNetDevice;
 
 /**
  * \brief base class for Rescue MAC
  * \ingroup rescue
  */
-class RescueMacCsma : public RescueMac
+class RescueMacCsma : public LowRescueMac
 {
 public:
   RescueMacCsma ();
@@ -52,25 +60,18 @@ public:
   static TypeId GetTypeId (void);
  
   /**
-   * \param cw the minimum congestion window
-   */ 
-  virtual void SetCwMin (uint32_t cw);
-  /**
-   * \param duration the slot duration
+   * Clear the transmission queues and pending packets, reset counters.
    */
-  virtual void SetSlotTime (Time duration);
-  /**
-   * \return current congestion window
-   */ 
-  virtual uint32_t GetCw (void);
-  /**
-   * \return the current slot duration.
-   */
-  virtual Time GetSlotTime (void);
+  virtual void Clear (void);
+
   /**
    * \param phy the physical layer to attach to this MAC.
    */
   virtual void AttachPhy (Ptr<RescuePhy> phy);
+  /**
+   * \param hiMac the HI-MAC sublayer to attach to this (lower) MAC.
+   */
+  virtual void SetHiMac (Ptr<RescueMac> hiMac);
   /**
    * \param dev the device this MAC is attached to.
    */
@@ -91,21 +92,66 @@ public:
   virtual int64_t AssignStreams (int64_t stream);
 
   /**
-   * Clear the transmission queues and pending packets, reset counters.
-   */
-  virtual void Clear (void);
+   * \param cw the minimum contetion window
+   */ 
+  void SetCwMin (uint32_t cw);
   /**
-   * \param address the current address of this MAC layer.
-   */
-  virtual void SetAddress (Mac48Address addr);
+   * \param cw the maximal contetion window
+   */ 
+  void SetCwMax (uint32_t cw);
   /**
-   * \return broadcast address
+   * \param duration the slot duration
    */
-  virtual Mac48Address GetBroadcast (void) const;
+  void SetSlotTime (Time duration);
   /**
-   * \return the current address of this MAC layer.
+   * \param duration the slot duration
    */
-  virtual Mac48Address GetAddress () const;
+  void SetSifsTime (Time duration);
+  /**
+   * \param duration the slot duration
+   */
+  void SetLifsTime (Time duration);
+  /**
+   * \param length the length of queues used by this MAC
+   */
+  void SetQueueLimits (uint32_t length);
+  /**
+   * \param duration the Basic ACK Timeout duration
+   */
+  void SetBasicAckTimeout (Time duration);
+
+  /**
+   * \return minimal contention window
+   */ 
+  uint32_t GetCwMin (void) const;
+  /**
+   * \return maximal contention window
+   */ 
+  uint32_t GetCwMax (void) const;
+  /**
+   * \return current contention window
+   */ 
+  uint32_t GetCw (void) const;
+  /**
+   * \return the current slot duration.
+   */
+  Time GetSlotTime (void) const;
+  /**
+   * \return the current slot duration.
+   */
+  Time GetSifsTime (void) const;
+  /**
+   * \return the current slot duration.
+   */
+  Time GetLifsTime (void) const;
+  /**
+   * \return length the length of queues used by this MAC
+   */
+  uint32_t GetQueueLimits (void) const;
+  /**
+   * \return duration the Basic ACK Timeout duration
+   */
+  Time GetBasicAckTimeout (void) const;
   
   /**
    * \param pkt the packet to send.
@@ -117,15 +163,50 @@ public:
    */
   virtual bool Enqueue (Ptr<Packet> pkt, Mac48Address dest);
   /**
+   * \param pkt the control packet to send.
+   * \param phyHdr the phy header associated with the packet.
+   */
+  virtual bool EnqueueCtrl (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+
+  /**
+   * Method used to start operation of this lower MAC entity 
+   * (eg. start CSMA-CA MAC at the beginning of Contention Period)
+   *
+   * /return MAC was started succesfully.
+   */
+  virtual bool StartOperation ();
+  /**
+   * Method used to start operation of this lower MAC entity 
+   * (eg. start CSMA-CA MAC at the beginning of Contention Period)
+   *
+   * \param duration the duration of operation period
+   *
+   * /return MAC was started succesfully.
+   */
+  virtual bool StartOperation (Time duration);
+  /**
+   * Method used to stop operation of this lower MAC entity 
+   * (eg. stop CSMA-CA MAC at the and of Contention Period)
+   *
+   * /return MAC was stopped succesfully.
+   */
+  virtual bool StopOperation ();
+  /**
+   * Method used to stop operation of this lower MAC entity 
+   * (eg. stop CSMA-CA MAC at the and of Contention Period)
+   *
+   * \param duration the duration of inactivity period
+   *
+   * /return MAC was stopped succesfully.
+   */
+  virtual bool StopOperation (Time duration);
+
+  /**
    * This method is called after end of packet transmission
    *
    * \param pkt transmitted packet
    */
   virtual void SendPacketDone (Ptr<Packet> pkt);
-  /**
-   * \param upCallback the callback to invoke when a packet must be forwarded up the stack.
-   */
-  virtual void SetForwardUpCb (Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb);
   /**
    * Method used by PHY to notify MAC about begin of frame reception
    *
@@ -155,15 +236,6 @@ private:
   } State;
   std::string StateToString (State state);
   
-  /**
-   * \return the current SIFS duration.
-   */
-  Time GetSifs (void) const;
-  /**
-   * \return the current LIFS duration.
-   */
-  Time GetLifs (void) const;
-
   /**
    * Invoked to calculate control packet (e.g. ACK) TX duration
    *
@@ -207,6 +279,10 @@ private:
    */ 
   void Dequeue ();
   /**
+   * invoked to remove current control packet from CTRL TX queue
+   */ 
+  //void DequeueCtrl ();
+  /**
    * invoked to transmit DATA frame
    */ 
   void SendData ();
@@ -242,9 +318,17 @@ private:
    */ 
   bool SendPacket (std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt, RescueMode mode);
   /**
-   * invoked when transmission did not start to try again after LIFS period
+   * invoked when transmission was not successful to try again after LIFS period
+   *
+   * \param pkt packet for which transmission was not successful
    */
-  void StartOver ();
+  void StartOver (Ptr<Packet> pkt);
+  /**
+   * invoked when transmission was not successful to try again after LIFS period
+   *
+   * \param pktHdr pair of packet and PHY header for which transmission was not successful
+   */
+  void StartOver (std::pair<Ptr<Packet>, RescuePhyHeader> pktHdr);
   /**
    * invoked after data transmission to prepare for new one 
    * (reset CW, increase sequence counter etc.)
@@ -336,10 +420,9 @@ private:
   /**
    * invoked when ACK Timoeut counter expires
    *
-   * \param pkt packet for which the timeout has expired
-   * \param hdr MAC header of the packet for which the timeout has expired
+   * \param pkt packet for which the timeout has expired (including header)
    */
-  void AckTimeout (Ptr<Packet> pkt, RescueMacHeader hdr);
+  void AckTimeout (Ptr<Packet> pkt);
   /**
    * invoked to expand contention window value
    */
@@ -361,11 +444,13 @@ private:
    */
   bool IsNewSequence (Mac48Address addr, uint16_t seq);
   
-  Callback <void, Ptr<Packet>, Mac48Address, Mac48Address> m_forwardUpCb;   //!< The callback to invoke when a packet must be forwarded up the stack
+  bool m_enabled; //!< True for this CSMA MAC during Contention Period
 
   Ptr<RescuePhy> m_phy;                                     //!< Pointer to RescuePhy (actually send/receives frames)
+  Ptr<RescueMac> m_hiMac;                                   //!< Pointer to (higher) RescueMac
   Ptr<RescueNetDevice> m_device;                            //!< Pointer to RescueNetDevice
-  Ptr<RescueRemoteStationManager> m_remoteStationManager;   //!< Pointer to WifiRemoteStationManager (rate control)
+  Ptr<RescueRemoteStationManager> m_remoteStationManager;   //!< Pointer to RescueRemoteStationManager (rate control)
+  Ptr<RescueArqManager> m_arqManager;                       //!< Pointer to RescueArqManager (ARQ control)
   Ptr<UniformRandomVariable> m_random;                      //!< Provides uniform random variables.
     
   EventId m_ccaTimeoutEvent;        //!< CCA procedure timeout event
@@ -381,28 +466,31 @@ private:
   Time m_sifs;          //!< SIFS duration
   Time m_lifs;          //!< LIFS duration
 
-  Mac48Address m_address;   //!< Address of this MAC
   State m_state;            //!< Current state of this MAC
   uint16_t m_cw;            //!< Current contention window
-  uint16_t m_sequence;      //!< Sequence counter of this MAC
-  uint16_t m_interleaver;   //!< Counter of set interlever
+  uint16_t m_sequence;      //!< Sequence counter of this MAC (used if ARQ manager is not specified)
+  uint8_t m_interleaver;    //!< Counter to set interlever
   uint32_t m_queueLimit;    //!< Maximal queue(s) size
 
   Time m_backoffRemain;     //!< Remaining BACKOFF time
   Time m_backoffStart;      //!< The time of last BACKOFF counter start
-  Time m_ackTimeout;        //!< The maximal duration of ACK awaiting
+  Time m_basicAckTimeout;   //!< The maximal duration of ACK awaiting
+  Time m_opEnd;             //!< The end of current operation period
+  Time m_nopBegin;          //!< The beginning of next operation period
 
   Ptr<Packet> m_pktTx;                                  //!< Currently transmitted packet (any)
   Ptr<Packet> m_pktData;                                //!< Currently transmitted DATA packet
   std::pair<Ptr<Packet>, RescuePhyHeader> m_pktRelay;   //!< Currently RELAYED DATA packet
   
 
+  //Relay Queue stores MAC frames and PHY headers
   typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> > RelayQueue;
   typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> >::reverse_iterator RelayQueueRI;
   typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> >::iterator RelayQueueI;
 
   std::list<Ptr<Packet> > m_pktQueue;   //!< The queue for newly originated frames
   RelayQueue m_pktRelayQueue;           //!< The queue for frames to forward
+  RelayQueue m_ctrlPktQueue;            //!< The queue for control frames to transmit
   RelayQueue m_ackForwardQueue;         //!< The queue for ACK frames to forward
   RelayQueue m_ackCache;                //!< The memory to store recently forwarded ACK in case of retransmission need
 
@@ -410,64 +498,78 @@ private:
 
   std::list<std::pair<Mac48Address, uint16_t> > m_seqList;  //!< The list of MAC addresses and associated sequence numbers
 
-
   /*
-   * Structure to keep information about transmitted frames in order to:
-   *  - prevent loops
-   *  - perform ARQ
-   *  - eliminate duplicates
-   */
-  struct FrameInfo;
-
-  typedef std::list<struct FrameInfo> FramesInfo;     
-  typedef std::list<struct FrameInfo>::reverse_iterator FramesInfoRI;
-  typedef std::list<struct FrameInfo>::iterator FramesInfoI;
-
-  /**
-   * A struct to keep information about transmitted frames (to prevent loops)
-   *
-   * \param dst destination address
-   * \param src source address
-   * \param seq_no sequence number
-   * \param il interleaver number (to distinguish retransmissions)
-   * \param tstamp time of packet transmission
+   * List to keep information about transmitted frames in order to prevent loops during flooding
    */
   struct FrameInfo
-  {
-    FrameInfo (Mac48Address dst,
-               Mac48Address src,
-               uint16_t seq_no,
-               uint16_t il,
-               bool ACKed,
-               Time tstamp);
-    FrameInfo (Mac48Address dst,
-               Mac48Address src,
-               uint16_t seq_no,
-               uint16_t il,
-               Time tstamp);
-    FrameInfo (Mac48Address dst,
-               uint16_t seq_no,
-               bool ACKed,
-               Time tstamp);
-    FrameInfo (Mac48Address dst,
-               uint16_t seq_no,
-               Time tstamp);
-    Mac48Address dst;
-    Mac48Address src;
-    uint16_t seq_no;
-    uint16_t il;
-    bool ACKed;
-    Time tstamp;
-  };
+    {
+      FrameInfo (uint8_t il,
+                 bool ACKed,
+                 bool retried);
+      uint8_t il;
+      bool ACKed;
+      bool retried;
+    };
+  typedef std::map<uint16_t, struct FrameInfo> SeqIlList;
+  struct seqIlAck
+    {
+      seqIlAck (SeqIlList::iterator& it) 
+        : seq (it->first), il (it->second.il), 
+          ACKed (it->second.ACKed), retried (it->second.retried) {}
+      const uint16_t& seq;
+      uint8_t& il;
+      bool& ACKed;
+      bool& retried;
+    };
+  typedef std::map<std::pair<Mac48Address, Mac48Address>, SeqIlList> RecvSendSeqList;
+  struct srcDstSeqList
+    {
+      srcDstSeqList (RecvSendSeqList::iterator& it) 
+        : src (it->first.first), dst (it->first.second), seqList (it->second) {}
+      const Mac48Address& src;
+      const Mac48Address& dst;
+      SeqIlList& seqList;
+    };
+  RecvSendSeqList m_sentFrames; //!< List of recently transmitted / relayed frames - to prevent loops
 
-  FramesInfo m_sentFrames;      //!< List of recently transmitted / relayed frames - to prevent loops
-  FramesInfo m_createdFrames;   //!< List of originated frames - for ARQ
-  FramesInfo m_receivedFrames;  //!< List of received frames - to eliminate duplicates
+  /*
+   * List to keep information about transmitted frames in order to perform ARQ
+   */ 
+  typedef std::map<uint16_t, bool> SeqList;
+  struct seqAck
+    {
+      seqAck (SeqList::iterator& it) 
+        : seq (it->first), ACKed (it->second) {}
+      const uint16_t& seq;
+      bool& ACKed;
+    };
+  typedef std::map<Mac48Address, SeqList> SendSeqList;
+  struct dstSeqList
+    {
+      dstSeqList (SendSeqList::iterator& it) 
+        : dst (it->first), seqList (it->second) {}
+      const Mac48Address& dst;
+      SeqList& seqList;
+    };
+  SendSeqList m_createdFrames; //!< List of originated frames - for ARQ
+
+  /*
+   * List to keep information about transmitted frames in order to eliminate duplicates
+   */ 
+  typedef std::map<Mac48Address, uint16_t> RecvSeqList;
+  struct srcSeq
+    {
+      srcSeq (RecvSeqList::iterator& it) 
+        : src (it->first), seq (it->second) {}
+      const Mac48Address& src;
+      uint16_t& seq;
+    };
+  RecvSeqList m_receivedFrames; //!< List of received frames seq. numbers - to eliminate duplicates
  
 
 
   // for trace and performance evaluation
-  TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescueMacHeader &> m_traceEnqueue;            //<! Trace Hookup for enqueue a DATA
+  /*TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescueMacHeader &> m_traceEnqueue;            //<! Trace Hookup for enqueue a DATA
   TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescueMacHeader &> m_traceAckTimeout;         //<! Trace Hookup for ACK Timeout
   TracedCallback<uint32_t, uint32_t, Mac48Address, bool> m_traceSendDataDone;                               //!< Trace Hookup for succesfull DATA TX (after ACK RX)
 
@@ -476,8 +578,10 @@ private:
   TracedCallback<uint32_t, uint32_t, Ptr<const Packet> > m_traceDataRx;                                     //<! Trace Hookup for DATA RX (by final station)
   TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescuePhyHeader &> m_traceAckTx;              //<! Trace Hookup for ACK TX (originated)
   TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescuePhyHeader &> m_traceAckForward;         //<! Trace Hookup for ACK forwarding
+  TracedCallback<uint32_t, uint32_t, Ptr<const Packet>, const RescuePhyHeader &> m_traceCtrlTx;             //<! Trace Hookup for CTRL TX*/
  
 protected:
+  virtual void DoDispose ();
 };
 
 }

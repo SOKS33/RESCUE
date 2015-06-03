@@ -72,6 +72,7 @@ typedef struct
   Time txDuration;
   Time txEnd;
   double_t rxPower;
+  Time procDelay;
 } NoiseEntry;
 
 public:
@@ -165,13 +166,23 @@ private:
   void ReceivePacketDone (uint32_t i, NoiseEntry ne);
 
   /**
+   * This method is scheduled by SendPacket to add 
+   * given noise entry related
+   *
+   * \param i index of the corresponding RescuePhy in the PHY list
+   * \param ne the noise entry to add
+   */
+  void AddNoiseEntry (uint32_t i, NoiseEntry ne);
+
+  /**
    * This method is scheduled by ReceivePacketDone to delete 
    * given noise entry related
    *
    * \param ne the noise entry to delete
    */
   void DeleteNoiseEntry (NoiseEntry ne);
-  
+
+  Time m_addNoiseEntryEarlier; //!< Add tx-flow earlier a certain time  
   Time m_delNoiseEntryLater; //!< Delete tx-flow later a certain time
   double m_noiseFloor; //!< Noise Floor (dBm)
   

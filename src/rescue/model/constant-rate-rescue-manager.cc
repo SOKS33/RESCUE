@@ -1,6 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2004,2005 INRIA
+ * Copyright (c) 2015 AGH University of Science nad Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -23,6 +24,7 @@
 #include "constant-rate-rescue-manager.h"
 
 #include "ns3/string.h"
+#include "ns3/uinteger.h"
 #include "ns3/assert.h"
 #include "ns3/log.h"
 
@@ -48,6 +50,14 @@ ConstantRateRescueManager::GetTypeId (void)
                    StringValue ("OfdmRate6Mbps"),
                    MakeRescueModeAccessor (&ConstantRateRescueManager::m_ctlMode),
                    MakeRescueModeChecker ())
+    .AddAttribute ("DataCw", "The contention window to use for every data packet transmission",
+                   UintegerValue (15),
+                   MakeUintegerAccessor (&ConstantRateRescueManager::m_dataCw),
+                   MakeUintegerChecker<uint32_t> ())
+    .AddAttribute ("ControlCw", "The contention window to use for every control packet transmission.",
+                   UintegerValue (8),
+                   MakeUintegerAccessor (&ConstantRateRescueManager::m_ctlCw),
+                   MakeUintegerChecker<uint32_t> ())
   ;
   return tid;
 }
@@ -72,10 +82,18 @@ ConstantRateRescueManager::DoCreateStation (void) const
 
 
 void
-ConstantRateRescueManager::DoReportRxOk (RescueRemoteStation *station,
-                                       double rxSnr, RescueMode txMode)
+ConstantRateRescueManager::DoReportRxOk (RescueRemoteStation *senderStation,
+                                         RescueRemoteStation *sourceStation,
+                                         double rxSnr, RescueMode txMode, bool wasReconstructed)
 {
-  NS_LOG_FUNCTION (this << station << rxSnr << txMode);
+  NS_LOG_FUNCTION (this << senderStation << sourceStation << rxSnr << txMode << ((wasReconstructed) ? "joint decoder was used" : ""));
+}
+void
+ConstantRateRescueManager::DoReportRxFail (RescueRemoteStation *senderStation,
+                                           RescueRemoteStation *sourceStation,
+                                           double rxSnr, RescueMode txMode, bool wasReconstructed)
+{
+  NS_LOG_FUNCTION (this << senderStation << sourceStation << rxSnr << txMode << ((wasReconstructed) ? "joint decoder was used" : ""));
 }
 void
 ConstantRateRescueManager::DoReportDataFailed (RescueRemoteStation *station)
@@ -96,10 +114,19 @@ ConstantRateRescueManager::DoReportFinalDataFailed (RescueRemoteStation *station
 }
 
 RescueMode
-ConstantRateRescueManager::DoGetDataTxMode (RescueRemoteStation *st, uint32_t size)
+ConstantRateRescueManager::DoGetDataTxMode (RescueRemoteStation *st, Ptr<const Packet> packet, uint32_t size)
 {
   NS_LOG_FUNCTION (this << st << size);
+  //std::cout << "ADDR: " << st->m_state->m_address << " SIZE: " << size << std::endl;
+   
   return m_dataMode;
+}
+
+uint32_t
+ConstantRateRescueManager::DoGetDataCw (RescueRemoteStation *st, Ptr<const Packet> packet, uint32_t size)
+{
+  NS_LOG_FUNCTION (this << st << size);
+  return m_dataCw;
 }
 
 RescueMode
@@ -107,6 +134,20 @@ ConstantRateRescueManager::DoGetAckTxMode (RescueRemoteStation *st, RescueMode r
 {
   NS_LOG_FUNCTION (this << st);
   return m_ctlMode;
+}
+
+RescueMode
+ConstantRateRescueManager::DoGetAckTxMode_ (RescueRemoteStation *st)
+{
+  NS_LOG_FUNCTION (this << st);
+  return m_ctlMode;
+}
+
+uint32_t
+ConstantRateRescueManager::DoGetAckCw (RescueRemoteStation *st)
+{
+  NS_LOG_FUNCTION (this << st);
+  return m_ctlCw;
 }
 
 bool

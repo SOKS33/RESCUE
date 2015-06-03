@@ -56,6 +56,11 @@ RescueChannel::GetTypeId ()
                    PointerValue (CreateObject<ConstantSpeedPropagationDelayModel> ()),
                    MakePointerAccessor (&RescueChannel::m_delay),
                    MakePointerChecker<PropagationDelayModel> ())
+    .AddAttribute ("InsertTxFlowEarlier",
+                   "Insert tx-flow earlier a certain time",
+                   TimeValue (NanoSeconds (10)),
+                   MakeTimeAccessor (&RescueChannel::m_addNoiseEntryEarlier),
+                   MakeTimeChecker ())
     .AddAttribute ("DeleteTxFlowLater",
                    "Delete tx-flow later a certain time",
                    TimeValue (NanoSeconds (100)),
@@ -149,8 +154,11 @@ RescueChannel::SendPacket (Ptr<RescuePhy> phy, Ptr<Packet> packet, double txPowe
           ne.phy = it->second;
           ne.rxPower = rxPower;
           ne.txEnd = Simulator::Now () + txDuration + delay;
+          ne.procDelay = NanoSeconds (0);
 
-          Simulator::ScheduleWithContext (dstNodeId, delay, &RescueChannel::ReceivePacket, this, j, ne);
+          //Simulator::ScheduleWithContext (dstNodeId, delay - m_addNoiseEntryEarlier, &RescueChannel::AddNoiseEntry, this, j, ne);
+          Simulator::ScheduleWithContext (dstNodeId, delay, &RescueChannel::AddNoiseEntry, this, j, ne);
+          //Simulator::ScheduleWithContext (dstNodeId, delay, &RescueChannel::ReceivePacket, this, j, ne);
         }
       j++;
     }
@@ -166,11 +174,73 @@ RescueChannel::SendPacketDone (Ptr<RescuePhy> phy, Ptr<Packet> packet)
 }
 
 void 
-RescueChannel::ReceivePacket (uint32_t i, NoiseEntry ne)
+RescueChannel::AddNoiseEntry (uint32_t i, NoiseEntry ne)
 {
   NS_LOG_FUNCTION ("dev:" << i);
+
+  double maxRxPower = ne.rxPower;
+  double minRxPower = ne.rxPower;
+  Time maxTxStart;
+  Time minTxStart;
+  Time preambleSimbolDuration = NanoSeconds (1000000000/ne.phy->GetPhyPreambleMode (ne.mode).GetDataRate () + 1);
+  Time delay = preambleSimbolDuration; 
+
+  //check stronger noise entries starting within the first premble simbol period
+  //or weaker transmissions that has started earlier but the first preamble simbol is not ended
+  std::list<NoiseEntry>::iterator it = m_noiseEntry.begin ();
+  for (; it != m_noiseEntry.end (); ++it)
+    {
+      if ( (it->packet != ne.packet)
+           && (it->phy == ne.phy) )
+        {
+          //other frame transmission detected by this phy
+          Time txStart = it->txEnd - it->txDuration;
+
+          if ( (it->rxPower > maxRxPower) //is stronger transmission
+               && (txStart >= Simulator::Now ()) //transmission starts after this transmission (or at the same time) 
+               && (txStart <= (Simulator::Now () + preambleSimbolDuration) ) ) //transmission starts before end of first preamble simbol for this transmission
+            {
+              //stronger transmission starts within the first slot, delay this tx after the stronger one
+              //NS_LOG_DEBUG ("found stronger noise entry!");
+              maxRxPower = it->rxPower;
+              maxTxStart = txStart + it->procDelay;
+            }
+          else if ( (it->rxPower < minRxPower) //is weaker transmission
+                    && (txStart <= Simulator::Now ()) //transmission has started before this transmission (or at the same time) 
+                    && (txStart > (Simulator::Now () - preambleSimbolDuration) ) ) //this transmission starts within the first preamble simbol of the weakest one tx
+            {
+              //weaker transmission has started but the first slot is not ended, should process this tx before the weaker one
+              //NS_LOG_DEBUG ("found weaker noise entry!");
+              minRxPower = it->rxPower;
+              minTxStart = txStart + it->procDelay;
+            }
+        }
+    }
+  NS_LOG_DEBUG ("found: maxTxPower: " << maxRxPower << ", start: " << maxTxStart << ", minTxPower: " << minRxPower << ", start: " << minTxStart);
+  if (maxRxPower > ne.rxPower)
+    {
+      //delay this transmission processing after the found noise entry starts
+      NS_LOG_DEBUG ("STRONGER RX: start: " << maxTxStart);
+      delay = maxTxStart - Simulator::Now () + NanoSeconds (1);
+    }
+  else if (minRxPower < ne.rxPower)
+    {
+      //start this transmission processing before processing of the found noise entry starts
+      NS_LOG_DEBUG ("WEAKER RX: start: " << minTxStart);
+      delay = minTxStart - Simulator::Now () - NanoSeconds (1);
+    }
+
+  ne.procDelay = delay;
   m_noiseEntry.push_back (ne);
-  m_devList[i].second->ReceivePacket (ne.packet, ne.mode, ne.txDuration, ne.rxPower);
+  Simulator::Schedule (delay, &RescueChannel::ReceivePacket, this, i, ne);
+}
+
+void 
+RescueChannel::ReceivePacket (uint32_t i, NoiseEntry ne)
+{
+  NS_LOG_FUNCTION ("dev:" << i << ", rxPower: " << ne.rxPower);
+  //m_noiseEntry.push_back (ne);
+  m_devList[i].second->ReceivePacket (ne.packet, ne.mode, ne.txDuration - ne.procDelay, ne.rxPower);
   Simulator::Schedule (ne.txDuration, &RescueChannel::ReceivePacketDone, this, i, ne);
 }
 
@@ -210,6 +280,7 @@ RescueChannel::GetNoiseW (Ptr<RescuePhy> phy, Ptr<Packet> signal)
     {
       if (it->phy == phy && it->packet != signal && it->txEnd + NanoSeconds (1) >= now)
         {
+          NS_LOG_DEBUG ("add noise: " << DbmToW (it->rxPower));
           noiseW += DbmToW (it->rxPower);
         }
     }

@@ -1,6 +1,7 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006,2007 INRIA
+ * Copyright (c) 2015 AGH University of Science nad Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,6 +17,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ *
+ * Adapted for Rescue by: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  */
 #ifndef RESCUE_REMOTE_STATION_MANAGER_H
 #define RESCUE_REMOTE_STATION_MANAGER_H
@@ -34,6 +37,7 @@ namespace ns3 {
 struct RescueRemoteStation;
 struct RescueRemoteStationState;
 class RescuePhy;
+class RescueMac;
 
 /**
  * \brief Tid independent remote station statistics
@@ -53,6 +57,7 @@ public:
    * success transmission.
    */
   void NotifyTxSuccess (uint32_t retryCounter);
+  void NotifyTxSuccessSNR (uint32_t retryCounter, double snr);
   /// Updates average frame error rate when final data has failed.
   void NotifyTxFailed ();
   /// Return frame error rate (probability that frame is corrupted due to transmission error).
@@ -73,6 +78,8 @@ private:
   Time m_lastUpdate;
   /// moving percentage of failed frames
   double m_failAvg;
+  /// average SNR(?)
+  double m_snrAvg;
 };
 
 /**
@@ -102,6 +109,29 @@ public:
   virtual void SetupPhy (Ptr<RescuePhy> phy);
 
   /**
+   * \param phy the PHY of this device
+   */
+  void SetupMac (Ptr<RescueMac> mac);
+
+  /**
+   * \param cw the minimum contetion window
+   */ 
+  void SetCwMin (uint32_t cw);
+  /**
+   * \param cw the maximal contetion window
+   */ 
+  void SetCwMax (uint32_t cw);
+
+  /**
+   * \return minimal contention window
+   */ 
+  uint32_t GetCwMin (void);
+  /**
+   * \return maximal contention window
+   */ 
+  uint32_t GetCwMax (void);
+
+  /**
    * Return the maximum STA retry count (SRC).
    *
    * \return the maximum SRC
@@ -113,6 +143,11 @@ public:
    * \param maxSrc the maximum SRC
    */
   void SetMaxSrc (uint32_t maxSrc);
+
+  /**
+   * \return the current address of associated MAC layer.
+   */
+  Mac48Address GetAddress (void) const;
 
   /**
    * Reset the station, invoked in a STA upon dis-association or in an AP upon reboot.
@@ -154,6 +189,12 @@ public:
    */
   RescueMode GetNonUnicastMode (void) const;
 
+  /**
+   * Return a contention window for non-unicast packets.
+   *
+   * \return contention window for non-unicast packets
+   */
+  uint32_t GetNonUnicastCw (void) const;
 
   /**
    * Invoked in an AP upon disassociation of a
@@ -247,6 +288,13 @@ public:
    */
   RescueMode GetDataTxMode (Mac48Address address, Ptr<const Packet> packet, uint32_t fullPacketSize);
 
+  /**
+   * \param address remote address
+   * \param packet the packet to send
+   * \param fullPacketSize the size of the packet after its Rescue MAC header has been added.
+   * \return the contention window
+   */
+  uint32_t GetDataCw (Mac48Address address, Ptr<const Packet> packet, uint32_t fullPacketSize);
 
   /**
    * Should be invoked whenever the AckTimeout associated to a transmission
@@ -274,13 +322,27 @@ public:
   void ReportFinalDataFailed (Mac48Address address);
 
   /**
-   * \param address remote address
+   * \param senderAddress sender station address
+   * \param sourceAddress source station address
    * \param rxSnr the snr of the packet received
-   * \param txMode the transmission mode used for the packet received.
+   * \param txMode the transmission mode used for the packet received
+   * \param wasReconstructed true if the frame was received using joint decoding 
    *
    * Should be invoked whenever a packet is successfully received.
    */
-  void ReportRxOk (Mac48Address address, double rxSnr, RescueMode txMode);
+  void ReportRxOk (Mac48Address senderAddress, Mac48Address sourceAddress, 
+                   double rxSnr, RescueMode txMode, bool wasReconstructed);
+  /**
+   * \param senderAddress sender station address
+   * \param sourceAddress source station address
+   * \param rxSnr the snr of the packet received
+   * \param txMode the transmission mode used for the packet received
+   * \param wasReconstructed true if the frame was received using joint decoding 
+   *
+   * Should be invoked whenever a packet is successfully received.
+   */
+  void ReportRxFail (Mac48Address senderAddress, Mac48Address sourceAddress,
+                     double rxSnr, RescueMode txMode, bool wasReconstructed);
 
   /**
    * \param address remote address
@@ -299,11 +361,25 @@ public:
   RescueMode GetAckTxMode (Mac48Address address, RescueMode dataMode);
   /**
    * \param address
-   * \param dataMode the transmission mode used to send an ACK we just received
    * \return the transmission mode to use for the ACK to complete the data/ACK
    *          handshake.
    */
-  RescueMode GetBlockAckTxMode (Mac48Address address, RescueMode dataMode);
+  RescueMode GetAckTxMode (Mac48Address address);
+  /**
+   * \param address
+   * \return the CW for ACK forwarding
+   */
+  uint32_t GetAckCw (Mac48Address address);
+  /**
+   * \param address
+   * \return the transmission mode for the CTRL frame transmission.
+   */
+  RescueMode GetCtrlTxMode (Mac48Address address);
+  /**
+   * \param address
+   * \return the CW for CTRL frame tx
+   */
+  uint32_t GetCtrlCw (Mac48Address address);
   /**
    * \param address of the remote station
    * \return information regarding the remote station associated with the given address
@@ -379,7 +455,19 @@ private:
    *       of a unicast packet to decide which transmission mode to use.
    */
   virtual RescueMode DoGetDataTxMode (RescueRemoteStation *station,
+                                      Ptr<const Packet> packet,
                                       uint32_t size) = 0;
+ /**
+   * \param station the station that we need to communicate
+   * \param size size of the packet or fragment we want to send
+   * \return the transmission mode to use to send a packet to the station
+   *
+   * Note: This method can be called before starting the backoff for a unicast packet or a fragment
+   *       of a unicast packet to set specific contention window size.
+   */
+  virtual uint32_t DoGetDataCw (RescueRemoteStation *station,
+                                Ptr<const Packet> packet,
+                                uint32_t size) = 0;
  /**
    * \param station the station that we need to send the acknowledgment
    * \return the transmission mode to use to send a packet to the station
@@ -388,6 +476,7 @@ private:
    *       of a unicast packet to decide which transmission mode to use.
    */
   virtual RescueMode DoGetAckTxMode (RescueRemoteStation *station, RescueMode reqMode) = 0;
+  virtual RescueMode DoGetAckTxMode_ (RescueRemoteStation *station) = 0;
 
   /**
    * This method is a pure virtual method that must be implemented by the sub-class.
@@ -419,12 +508,28 @@ private:
    * This method is a pure virtual method that must be implemented by the sub-class.
    * This allows different types of RescueRemoteStationManager to respond differently,
    *
-   * \param station the station that sent the DATA to us
+   * \param senderStation the station that sent the DATA
+   * \param sourceStation the station that originated the DATA
    * \param rxSnr the SNR of the DATA we received
    * \param txMode the RescueMode the sender used to send the DATA
+   * \param wasReconstructed true if the frame was received using joint decoding
    */
-  virtual void DoReportRxOk (RescueRemoteStation *station,
-                             double rxSnr, RescueMode txMode) = 0;
+  virtual void DoReportRxOk (RescueRemoteStation *senderStation,
+                             RescueRemoteStation *sourceStation,
+                             double rxSnr, RescueMode txMode, bool wasReconstructed) = 0;
+  /**
+   * This method is a pure virtual method that must be implemented by the sub-class.
+   * This allows different types of RescueRemoteStationManager to respond differently,
+   *
+   * \param senderStation the station that sent the DATA
+   * \param sourceStation the station that originated the DATA
+   * \param rxSnr the SNR of the DATA we received
+   * \param txMode the RescueMode the sender used to send the DATA
+   * \param wasReconstructed true if the frame was received using joint decoding
+   */
+  virtual void DoReportRxFail (RescueRemoteStation *senderStation,
+                               RescueRemoteStation *sourceStation,
+                               double rxSnr, RescueMode txMode, bool wasReconstructed) = 0;
 
   /**
    * Return the state of the station associated with the given address.
@@ -442,6 +547,9 @@ private:
   RescueRemoteStation* Lookup (Mac48Address address) const;
 
   RescueMode GetControlAnswerMode (Mac48Address address, RescueMode reqMode);
+  RescueMode GetControlAnswerMode (Mac48Address address);
+
+  uint32_t GetControlCw (Mac48Address address);
 
   /**
    * A vector of RescueRemoteStations
@@ -463,6 +571,7 @@ private:
    * "DeviceRateSet").
    */
   Ptr<RescuePhy> m_phy;
+  Ptr<RescueMac> m_mac;        //!< Pointer to associated RescueMac
   RescueMode m_defaultTxMode;  //!< The default transmission mode
 
   /**
@@ -475,8 +584,12 @@ private:
    */
   RescueModeList m_bssBasicRateSet;
 
-  uint32_t m_maxSrc;  //!< Maximum STA retry count (SRC)
+  uint32_t m_maxSrc;    //!< Maximum STA retry count (SRC)
   RescueMode m_nonUnicastMode;  //!< Transmission mode for non-unicast DATA frames
+
+  uint16_t m_cwMin;     //!< Minimal value of contention window
+  uint16_t m_cwMax;     //!< Maximal value of contention window
+  uint16_t m_cwNonUnicast; //!< Contention window value for non unicast transmissions
 
   /**
    * The trace source fired when the transmission of a single data packet has failed

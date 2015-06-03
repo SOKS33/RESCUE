@@ -60,6 +60,8 @@ enum RescueCodeRate
   RESCUE_CODE_RATE_2_3,
   /** Rate 1/2 */
   RESCUE_CODE_RATE_1_2,
+  /** Rate 1/2 */
+  RESCUE_CODE_RATE_1_4,
   /** Rate 5/6 */
   RESCUE_CODE_RATE_5_6
 

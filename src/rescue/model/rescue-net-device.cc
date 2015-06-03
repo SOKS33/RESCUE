@@ -28,6 +28,7 @@
 #include "ns3/assert.h"
 #include "ns3/log.h"
 #include "ns3/mac48-address.h"
+
 #include "rescue-net-device.h"
 #include "rescue-phy.h"
 #include "rescue-mac.h"
@@ -85,6 +86,15 @@ RescueNetDevice::DoDispose ()
   NetDevice::DoDispose ();
 }
 
+void
+RescueNetDevice::DoInitialize ()
+{
+  m_phy->Initialize ();
+  m_mac->Initialize ();
+  m_stationManager->Initialize ();
+  NetDevice::DoInitialize ();
+}
+
 TypeId
 RescueNetDevice::GetTypeId ()
 {
@@ -98,6 +108,10 @@ RescueNetDevice::GetTypeId ()
                    PointerValue (),
                    MakePointerAccessor (&RescueNetDevice::GetPhy, &RescueNetDevice::SetPhy),
                    MakePointerChecker<RescuePhy> ())
+    /*.AddAttribute ("LowMac", "The lower MAC sublayer attached to this device.",
+                   PointerValue (),
+                   MakePointerAccessor (&RescueNetDevice::GetLowMac, &RescueNetDevice::SetLowMac),
+                   MakePointerChecker<RescueMac> ())*/
     .AddAttribute ("Mac", "The MAC layer attached to this device.",
                    PointerValue (),
                    MakePointerAccessor (&RescueNetDevice::GetMac, &RescueNetDevice::SetMac),
@@ -131,18 +145,56 @@ RescueNetDevice::SetMac (Ptr<RescueMac> mac)
 
       if (m_phy != 0)
         {
-          m_phy->SetMac (m_mac);
           m_mac->AttachPhy (m_phy);
           m_mac->SetDevice (this);
-          NS_LOG_DEBUG ("Attached MAC to PHY");
+          m_phy->SetMac (m_mac);
+          NS_LOG_DEBUG ("Attached PHY to MAC");
         }
+      /*if (m_lowMac != 0)
+        {
+          m_hiMac->SetlowMac (m_lowMac);
+          m_lowMac->SetHiMac (m_hiMac);
+          NS_LOG_DEBUG ("HI-MAC attached to lower MAC");
+        }*/
       if (m_stationManager != 0)
         {
           m_mac->SetRemoteStationManager (m_stationManager);
+          m_stationManager->SetupMac (m_mac);
+          NS_LOG_DEBUG ("HI-MAC conected to Station Manager");
         }
       m_mac->SetForwardUpCb (MakeCallback (&RescueNetDevice::ForwardUp, this));
     }
 }
+
+/*void
+RescueNetDevice::SetLowMac (Ptr<RescueMac> lowMac)
+{
+  if (mac != 0)
+    {
+      m_lowMac = lowMac;
+      NS_LOG_DEBUG ("Set MAC");
+
+      if (m_phy != 0)
+        {
+          m_phy->SetMac (m_lowMac);
+          m_lowMac->AttachPhy (m_phy);
+          m_lowMac->SetDevice (this);
+          NS_LOG_DEBUG ("Attached MAC to PHY");
+        }
+      if (m_mac != 0)
+        {
+          m_mc->SetlowMac (m_lowMac);
+          m_lowMac->SetMac (m_mac);
+          NS_LOG_DEBUG ("HI-MAC attached to lower MAC");
+        }
+      if (m_stationManager != 0)
+        {
+          m_lowMac->SetRemoteStationManager (m_stationManager);
+          NS_LOG_DEBUG ("MAC conected to Station Manager");
+        }
+      //m_lowMac->SetForwardUpCb (MakeCallback (&RescueNetDevice::ForwardUp, this));
+    }
+}*/
 
 void
 RescueNetDevice::SetPhy (Ptr<RescuePhy> phy)
@@ -152,11 +204,19 @@ RescueNetDevice::SetPhy (Ptr<RescuePhy> phy)
       m_phy = phy;
       m_phy->SetDevice (Ptr<RescueNetDevice> (this));
       NS_LOG_DEBUG ("Set PHY");
+      /*if (m_lowMac != 0)
+        {
+          m_lowMac->AttachPhy (phy);
+          m_lowMac->SetDevice (this);
+          m_phy->SetMac (m_lowMac);
+          NS_LOG_DEBUG ("Attached PHY to MAC");
+        }*/
       if (m_mac != 0)
         {
-          m_mac->AttachPhy (phy);
+          m_mac->AttachPhy (m_phy);
           m_mac->SetDevice (this);
           m_phy->SetMac (m_mac);
+          //NS_LOG_DEBUG ("HI-MAC notified about PHY");
           NS_LOG_DEBUG ("Attached PHY to MAC");
         }
     }
@@ -184,9 +244,16 @@ RescueNetDevice::SetRemoteStationManager (Ptr<RescueRemoteStationManager> manage
     {
       m_stationManager = manager;
       NS_LOG_DEBUG ("Set REMOTE STATION MANAGER");
+      /*if (m_lowMac != 0)
+        {
+          m_lowMac->SetRemoteStationManager (m_stationManager);
+          NS_LOG_DEBUG ("MAC conected to Station Manager");
+        }*/
       if (m_mac != 0)
         {
           m_mac->SetRemoteStationManager (m_stationManager);
+          m_stationManager->SetupMac (m_mac);
+          NS_LOG_DEBUG ("HI-MAC conected to Station Manager");
         }
     }
 }
@@ -234,6 +301,12 @@ RescueNetDevice::GetMac () const
 {
   return m_mac;
 }
+
+/*Ptr<LowRescueMac>
+RescueNetDevice::GetLowMac () const
+{
+  return m_lowMac;
+}*/
 
 Ptr<RescuePhy>
 RescueNetDevice::GetPhy () const

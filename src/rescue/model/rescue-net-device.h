@@ -45,7 +45,7 @@ class RescueMac;
  * \ingroup rescue
  *
  * This class holds together ns3::RescueChannel, ns3::RescuePhy,
- * ns3::RescueMac, and, ns3::RescueRemoteStationManager.
+ * ns3::RescueMac, ns3::LowRescueMac, and, ns3::RescueRemoteStationManager.
  */
 class RescueNetDevice : public NetDevice
 {
@@ -54,11 +54,20 @@ public:
 
   RescueNetDevice ();
   virtual ~RescueNetDevice ();
+  /**
+   * Clears configuration
+   */
+  void Clear (void);
 
+
+  /**
+   * \param mac the HI-MAC to use.
+   */
+  void SetMac (Ptr<RescueMac> mac);
   /**
    * \param mac the MAC to use.
    */
-  void SetMac (Ptr<RescueMac> mac);
+  //void SetLowMac (Ptr<RescueMac> lowMac);
   /**
    * \param phy the PHY to use.
    */
@@ -73,9 +82,13 @@ public:
   void SetRemoteStationManager (Ptr<RescueRemoteStationManager> manager);
 
   /**
-   * \return pointer to used MAC
+   * \return pointer to used HI-MAC 
    */
   Ptr<RescueMac> GetMac (void) const;
+  /**
+   * \return pointer to used lower MAC
+   */
+  //Ptr<RescueMac> GetLowMac (void) const;
   /**
    * \return pointer to used PHY
    */
@@ -85,10 +98,6 @@ public:
    */
   Ptr<RescueRemoteStationManager> GetRemoteStationManager (void) const;
 
-  /**
-   * Clears configuration
-   */
-  void Clear (void);
 
   // Purely virtual functions from base class
   virtual void SetIfIndex (const uint32_t index);
@@ -133,7 +142,8 @@ private:
   
   Ptr<Node> m_node;                                 //<! pointer to associated ns-3 node
   Ptr<RescueChannel> m_channel;                     //<! Pointer to RescueChannel
-  Ptr<RescueMac> m_mac;                             //!< Pointer to RescueMac
+  Ptr<RescueMac> m_mac;                           //!< Pointer to RescueMac
+  //Ptr<RescueMac> m_lowMac;                          //!< Pointer to RescueMac
   Ptr<RescuePhy> m_phy;                             //!< Pointer to RescuePhy
   Ptr<RescueRemoteStationManager> m_stationManager; //!< Pointer to WifiRemoteStationManager (rate control)
 
@@ -149,6 +159,7 @@ private:
   bool m_arp;
 
 protected:
+  virtual void DoInitialize ();
   virtual void DoDispose ();
 };
 

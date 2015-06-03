@@ -17,7 +17,9 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
+ * basing on ns-3 wifi module by:
+ * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
+ * Author: Mirko Banchi <mk.banchi@gmail.com>
  */
 
 #include "ns3/address-utils.h"
@@ -36,9 +38,9 @@ RescueMacHeader::RescueMacHeader ()
 
 RescueMacHeader::RescueMacHeader (const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type)
   : Header (),
+    m_type (type),
     m_srcAddr (srcAddr),
-    m_dstAddr (dstAddr),
-    m_type (type)
+    m_dstAddr (dstAddr)
 {
 }
 
@@ -65,6 +67,38 @@ RescueMacHeader::~RescueMacHeader ()
 
 // ------------------------ Set Functions -----------------------------
 void
+RescueMacHeader::SetType (uint8_t type)
+{
+  m_type = type;
+}
+void 
+RescueMacHeader::SetRetry (void)
+{
+  m_retry = 1;
+}
+void 
+RescueMacHeader::SetNoRetry (void)
+{
+  m_retry = 0;
+}
+
+void
+RescueMacHeader::SetFrameControl (uint8_t ctrl)
+{
+  m_type = ctrl & 0x07;
+  switch (m_type)
+    {
+      case RESCUE_MAC_PKT_TYPE_DATA:
+        m_retry = (ctrl >> 3) & 0x01;
+        break;
+      case RESCUE_MAC_PKT_TYPE_ACK:
+      case RESCUE_MAC_PKT_TYPE_B:
+      case RESCUE_MAC_PKT_TYPE_RR:
+        break;
+    }
+}
+
+void
 RescueMacHeader::SetSource (Mac48Address addr)
 {
   m_srcAddr = addr;
@@ -75,11 +109,6 @@ RescueMacHeader::SetDestination (Mac48Address addr)
   m_dstAddr = addr;
 }
 void
-RescueMacHeader::SetType (uint8_t type)
-{
-  m_type = type;
-}
-void
 RescueMacHeader::SetSequence (uint16_t seq)
 {
   m_sequence = seq;
@@ -88,6 +117,35 @@ RescueMacHeader::SetSequence (uint16_t seq)
 
 
 // ------------------------ Get Functions -----------------------------
+uint8_t
+RescueMacHeader::GetType (void) const
+{
+  return m_type;
+}
+bool
+RescueMacHeader::IsRetry (void) const
+{
+  return (m_retry == 1);
+}
+
+uint8_t
+RescueMacHeader::GetFrameControl (void) const
+{
+  uint8_t val = 0;
+  val |= m_type & 0x7;
+  switch (m_type)
+    {
+      case RESCUE_MAC_PKT_TYPE_DATA:
+        val |= (m_retry << 3) & (0x01 << 3);
+        break;
+      case RESCUE_MAC_PKT_TYPE_ACK:
+      case RESCUE_MAC_PKT_TYPE_B:
+      case RESCUE_MAC_PKT_TYPE_RR:
+        break;
+    }
+  return val;
+}
+
 Mac48Address
 RescueMacHeader::GetSource (void) const
 {
@@ -97,11 +155,6 @@ Mac48Address
 RescueMacHeader::GetDestination (void) const
 {
   return m_dstAddr;
-}
-uint8_t
-RescueMacHeader::GetType (void) const
-{
-  return m_type;
 }
 uint32_t 
 RescueMacHeader::GetSize (void) const
@@ -139,7 +192,7 @@ RescueMacHeader::GetSerializedSize (void) const
 void
 RescueMacHeader::Serialize (Buffer::Iterator i) const
 {
-  i.WriteU8 (m_type);
+  i.WriteU8 (GetFrameControl ());
   switch (m_type)
     {
     case RESCUE_MAC_PKT_TYPE_DATA:
@@ -161,7 +214,8 @@ RescueMacHeader::Deserialize (Buffer::Iterator start)
 {
   Buffer::Iterator i = start;
   
-  m_type = i.ReadU8 ();
+  uint8_t frame_control = i.ReadU8 ();
+  SetFrameControl (frame_control);
   switch (m_type)
     {
     case RESCUE_MAC_PKT_TYPE_DATA:
