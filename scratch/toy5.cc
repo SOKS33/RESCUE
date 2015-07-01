@@ -190,6 +190,18 @@ DataRxOkTrace(std::string context, uint32_t node, uint32_t iff, Ptr<const Packet
     }
 }
 
+uint32_t phy_send = 0, phy_recv = 0;
+
+void
+PhySendTrace(std::string context, uint32_t bs) {
+    phy_send++;
+}
+
+void
+PhyRecvTrace(std::string context, uint32_t bs) {
+    phy_recv++;
+}
+
 /* =========== Trace functions =========== */
 
 int main(int argc, char *argv[]) {
@@ -526,6 +538,8 @@ int main(int argc, char *argv[]) {
     Config::Connect("/NodeList/*/DeviceList/*/Mac/EnqueueOk", MakeCallback(&EnqueueOkTrace));
     Config::Connect("/NodeList/*/DeviceList/*/Mac/DataRxOk", MakeCallback(&DataRxOkTrace));
 
+    Config::Connect("/NodeList/*/DeviceList/*/Phy/SendOk", MakeCallback(&PhySendTrace));
+    Config::Connect("/NodeList/*/DeviceList/*/Phy/RecvOk", MakeCallback(&PhyRecvTrace));
 
 
     /* ============= Flow Monitor ============ */
@@ -597,9 +611,11 @@ int main(int argc, char *argv[]) {
         std::cout << "  Mean Jitter [ms]: " << jitter << std::endl;
         std::cout << "  Throughput [Mbps]: " << throughput << std::endl;
 
-        std::cout << lost << " " << delay << " " << jitter << " " << throughput << std::endl;
+        std::cout << lost << " " << delay << " " << jitter << " " << throughput
+                << " " << phy_send << " " << phy_recv << std::endl;
     }
 
+    std::cout << "SEND " << phy_send << " RECV " << phy_recv << std::endl;
     //    std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
     //    std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;
     //    std::cout << "  Tx Packets: " << m_send << std::endl;

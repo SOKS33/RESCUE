@@ -389,6 +389,9 @@ namespace ns3 {
         RxFrameAccumulator m_rxFrameAccumulator; //!< Received frames' copies buffer
 
     protected:
+        TracedCallback<uint32_t> m_traceSend; //<! Trace Hookup for enqueue a DATA
+        TracedCallback<uint32_t> m_traceRecv; //<! Trace Hookup for DATA RX (by final station)
+
     };
 
 } // namespace ns3

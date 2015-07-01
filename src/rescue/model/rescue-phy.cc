@@ -151,6 +151,12 @@ namespace ns3 {
                 BooleanValue(true),
                 MakeBooleanAccessor(&RescuePhy::m_useLOTF),
                 MakeBooleanChecker())
+                .AddTraceSource("SendOk",
+                "Trace Hookup for enqueue a DATA",
+                MakeTraceSourceAccessor(&RescuePhy::m_traceSend))
+                .AddTraceSource("RecvOk",
+                "Trace Hookup for enqueue a DATA",
+                MakeTraceSourceAccessor(&RescuePhy::m_traceRecv))
                 ;
         return tid;
     }
@@ -304,6 +310,8 @@ namespace ns3 {
     RescuePhy::SendPacketDone(Ptr<Packet> pkt) {
         NS_LOG_FUNCTION("");
         m_state = IDLE;
+        //MODIF
+        m_traceSend(1);
         m_lowMac->SendPacketDone(pkt);
     }
 
@@ -373,6 +381,9 @@ namespace ns3 {
         NS_LOG_INFO("rxPower: " << rxPower << " ,noise: " << m_channel->WToDbm(noiseW) << " ,sinr: " << sinr);
 
         if ((rxPower > m_rxThr) && (pkt == m_pktRx)) {
+
+            //MODIF
+            m_traceRecv(1);
 
             RescuePhyHeader hdr;
             pkt->RemoveHeader(hdr);

@@ -254,6 +254,21 @@ void RxTraceIP(const Ipv4Header &hdr, Ptr<const Packet> pkt) {
     NS_LOG_UNCOND("RX ");
 }
 
+
+uint32_t phy_send = 0, phy_recv = 0;
+
+void
+PhySendTrace(std::string context, Ptr<const Packet> pkt) {
+    if (pkt->GetSize() > 500)
+        phy_send++;
+}
+
+void
+PhyRecvTrace(std::string context, Ptr<const Packet> pkt) {
+    if (pkt->GetSize() > 500)
+        phy_recv++;
+}
+
 /* =========== Trace functions =========== */
 
 int main(int argc, char *argv[]) {
@@ -490,6 +505,10 @@ int main(int argc, char *argv[]) {
     Config::Connect("/NodeList/*/DeviceList/*/Mac/MacRx", MakeCallback(&DataRxOkTrace2));
     Config::Connect("/NodeList/*/DeviceList/*/Mac/MacPromiscRx", MakeCallback(&DataRxOkTrace3));
 
+    Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyTxBegin", MakeCallback(&PhySendTrace));
+    Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyRxEnd", MakeCallback(&PhyRecvTrace));
+
+
     Config::Connect("/NodeList/*/Ipv4L3Protocol/Tx", MakeCallback(&TxTraceIP));
     Config::Connect("/NodeList/*/Ipv4L3Protocol/Rx", MakeCallback(&RxTraceIP));
 
@@ -558,9 +577,10 @@ int main(int argc, char *argv[]) {
         std::cout << "  Mean Jitter [ms]: " << jitter << std::endl;
         std::cout << "  Throughput [Mbps]: " << throughput << std::endl;
 
-        std::cout << lost << " " << delay << " " << jitter << " " << throughput << std::endl;
+        std::cout << lost << " " << delay << " " << jitter << " " << throughput
+                << " " << phy_send << " " << phy_recv << std::endl;
     }
-
+    //    std::cout << "SEND " << phy_send << " RECV " << phy_recv << std::endl;
     //
     //    std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
     //    std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;

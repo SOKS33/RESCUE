@@ -77,15 +77,17 @@
  for prefix in "wifi" "rescue" ; do
      for r in ${ratelist[@]} ; do
          if [[ -f $res/$prefix-$r-all ]] ; then
-             avg=$(cat $res/$prefix-$r-all | awk '{s1+=$1; s2+=$2; s3+=$3; s4+=$4} END {print s1/NR " " s2/NR " " s3/NR " " s4/NR}')
+             avg=$(cat $res/$prefix-$r-all | awk '{s1+=$1; s2+=$2; s3+=$3; s4+=$4; s5+=$5; s6+=$6} END {print s1/NR " " s2/NR " " s3/NR " " s4/NR " " s5/NR " " s6/NR}')
              error=$(echo "$avg" | cut -d" " -f1)
              delay=$(echo "$avg" | cut -d" " -f2)
              jitter=$(echo "$avg" | cut -d" " -f3)
              throughput=$(echo "$avg" | cut -d" " -f4)
+             sendrecv=$(echo "$avg" | cut -d" " -f5,6)
              echo "$r $error" >> $res/$prefix-error.plot
              echo "$r $delay" >> $res/$prefix-delay.plot
              echo "$r $jitter" >> $res/$prefix-jitter.plot
              echo "$r $throughput" >> $res/$prefix-throughput.plot
+             echo "$r $sendrecv" >> $res/$prefix-sendrecv.plot
          else
              echo "${bred}$res/$prefix-$r-all does not exist ... INGORING ${default}"
          fi
@@ -158,6 +160,25 @@ plot '$res/wifi-throughput.plot' u 1:2:xtic(1) title 'wifi' w l ls 5 \
 , '$res/rescue-throughput.plot' u 1:2:xtic(1) title 'rescue' w l ls 15
 EOF
  echo "<img src='./index-throughput.svg'/> <br><br>" >> $res/index.html
+
+  $plot <<EOF
+set terminal svg enhanced
+set size 1,1
+set style fill empty
+set key inside left top vertical Right noreverse enhanced autotitles box linetype -1 linewidth 1.000 opaque
+set title "Send & Recv with various datarate for both wifi and rescue"
+set ylabel "Send & Recv (in pkts)"
+set xtics nomirror
+set xlabel 'Datarate (in Mbps)'
+set style line 5  lc rgb "dark-green" lt 1 lw 2
+set style line 15  lc rgb "red" lt 1 lw 2
+set output '$res/index-sendrecv.svg'
+plot '$res/wifi-sendrecv.plot' u 1:2:xtic(1) title 'wifi/send' w l ls 5 \
+,  '$res/rescue-sendrecv.plot' u 1:3:xtic(1) title 'wifi/recv' w l ls 15 \
+,  '$res/rescue-sendrecv.plot' u 1:2:xtic(1) title 'rescue/send' w l ls 5 \
+, '$res/rescue-sendrecv.plot' u 1:3:xtic(1) title 'rescue/recv' w l ls 15
+EOF
+ echo "<img src='./index-sendrecv.svg'/> <br><br>" >> $res/index.html
 
  echo "</div>" >> $res/index.html
 
