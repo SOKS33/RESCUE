@@ -29,29 +29,28 @@ namespace ns3 {
 
 
 
-/**
- * The length in octects of the RESCUE MAC FCS field
- */
-static const uint16_t RESCUE_MAC_FCS_LENGTH = 4;
+    /**
+     * The length in octects of the RESCUE MAC FCS field
+     */
+    static const uint16_t RESCUE_MAC_FCS_LENGTH = 4;
 
-/**
- * \ingroup rescue
- *
- * Implements the RESCUE MAC trailer
- */
-class RescueMacTrailer : public Trailer
-{
-public:
-  RescueMacTrailer ();
-  ~RescueMacTrailer ();
+    /**
+     * \ingroup rescue
+     *
+     * Implements the RESCUE MAC trailer
+     */
+    class RescueMacTrailer : public Trailer {
+    public:
+        RescueMacTrailer();
+        ~RescueMacTrailer();
 
-  static TypeId GetTypeId (void);
-  virtual TypeId GetInstanceTypeId (void) const;
-  virtual void Print (std::ostream &os) const;
-  virtual uint32_t GetSerializedSize (void) const;
-  virtual void Serialize (Buffer::Iterator start) const;
-  virtual uint32_t Deserialize (Buffer::Iterator start);
-};
+        static TypeId GetTypeId(void);
+        virtual TypeId GetInstanceTypeId(void) const;
+        virtual void Print(std::ostream &os) const;
+        virtual uint32_t GetSerializedSize(void) const;
+        virtual void Serialize(Buffer::Iterator start) const;
+        virtual uint32_t Deserialize(Buffer::Iterator start);
+    };
 
 } // namespace ns3
 

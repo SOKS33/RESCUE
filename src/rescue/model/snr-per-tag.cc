@@ -17,7 +17,7 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on NS-3 Wifi module by: 
+ * basing on NS-3 Wifi module by:
  * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>, Mirko Banchi <mk.banchi@gmail.com>, Konstantinos Katsaros <dinos.katsaros@gmail.com>
  */
 
@@ -27,116 +27,102 @@
 
 namespace ns3 {
 
-NS_OBJECT_ENSURE_REGISTERED (SnrPerTag)
-  ;
+    NS_OBJECT_ENSURE_REGISTERED(SnrPerTag)
+    ;
 
-TypeId
-SnrPerTag::GetTypeId (void)
-{
-  static TypeId tid = TypeId ("ns3::SnrPerTag")
-    .SetParent<Tag> ()
-    .AddConstructor<SnrPerTag> ()
-    .AddAttribute ("SNR", "The SNR of the last packet received",
-                   DoubleValue (0.0),
-                   MakeDoubleAccessor (&SnrPerTag::GetSNR),
-                   MakeDoubleChecker<double> ())
-    /*.AddAttribute ("PER", "The PER of the last packet received",
-                   DoubleValue (0.0),
-                   MakeDoubleAccessor (&SnrPerTag::GetPER),
-                   MakeDoubleChecker<double> ())*/
-    .AddAttribute ("BER", "The BER of the last packet received",
-                   DoubleValue (0.0),
-                   MakeDoubleAccessor (&SnrPerTag::GetBER),
-                   MakeDoubleChecker<double> ())
-  ;
-  return tid;
-}
+    TypeId
+    SnrPerTag::GetTypeId(void) {
+        static TypeId tid = TypeId("ns3::SnrPerTag")
+                .SetParent<Tag> ()
+                .AddConstructor<SnrPerTag> ()
+                .AddAttribute("SNR", "The SNR of the last packet received",
+                DoubleValue(0.0),
+                MakeDoubleAccessor(&SnrPerTag::GetSNR),
+                MakeDoubleChecker<double> ())
+                /*.AddAttribute ("PER", "The PER of the last packet received",
+                               DoubleValue (0.0),
+                               MakeDoubleAccessor (&SnrPerTag::GetPER),
+                               MakeDoubleChecker<double> ())*/
+                .AddAttribute("BER", "The BER of the last packet received",
+                DoubleValue(0.0),
+                MakeDoubleAccessor(&SnrPerTag::GetBER),
+                MakeDoubleChecker<double> ())
+                ;
+        return tid;
+    }
 
-TypeId
-SnrPerTag::GetInstanceTypeId (void) const
-{
-  return GetTypeId ();
-}
+    TypeId
+    SnrPerTag::GetInstanceTypeId(void) const {
+        return GetTypeId();
+    }
 
-SnrPerTag::SnrPerTag ()
-  : m_snr (0),
+    SnrPerTag::SnrPerTag()
+    : m_snr(0),
     //m_per (0),
-    m_ber (0)
-{
-}
+    m_ber(0) {
+    }
 
-
-SnrPerTag::SnrPerTag (double snr, /*double per,*/ double ber)
-  : m_snr (snr),
+    SnrPerTag::SnrPerTag(double snr, /*double per,*/ double ber)
+    : m_snr(snr),
     //m_per (per),
-    m_ber (ber)
-{
-}
+    m_ber(ber) {
+    }
 
+    uint32_t
+    SnrPerTag::GetSerializedSize(void) const {
+        return 2 * sizeof (double);
+    }
 
-uint32_t
-SnrPerTag::GetSerializedSize (void) const
-{
-  return 2 * sizeof (double);
-}
+    void
+    SnrPerTag::Serialize(TagBuffer i) const {
+        i.WriteDouble(m_snr);
+        //i.WriteDouble (m_per);
+        i.WriteDouble(m_ber);
+    }
 
-void
-SnrPerTag::Serialize (TagBuffer i) const
-{
-  i.WriteDouble (m_snr);
-  //i.WriteDouble (m_per);
-  i.WriteDouble (m_ber);
-}
+    void
+    SnrPerTag::Deserialize(TagBuffer i) {
+        m_snr = i.ReadDouble();
+        //m_per = i.ReadDouble ();
+        m_ber = i.ReadDouble();
+    }
 
-void
-SnrPerTag::Deserialize (TagBuffer i)
-{
-  m_snr = i.ReadDouble ();
-  //m_per = i.ReadDouble ();
-  m_ber = i.ReadDouble ();
-}
+    void
+    SnrPerTag::Print(std::ostream &os) const {
+        os << "snr=" << m_snr << /*" per=" << m_per <<*/ " ber=" << m_ber;
+    }
 
-void
-SnrPerTag::Print (std::ostream &os) const
-{
-  os << "snr=" << m_snr << /*" per=" << m_per <<*/ " ber=" << m_ber;
-}
+    void
+    SnrPerTag::SetSNR(double snr) {
+        m_snr = snr;
+    }
 
-void
-SnrPerTag::SetSNR (double snr)
-{
-  m_snr = snr;
-}
+    /*void
+    SnrPerTag::SetPER (double per)
+    {
+      m_per = per;
+    }*/
 
-/*void
-SnrPerTag::SetPER (double per)
-{
-  m_per = per;
-}*/
+    void
+    SnrPerTag::SetBER(double ber) {
+        m_ber = ber;
+    }
 
-void
-SnrPerTag::SetBER (double ber)
-{
-  m_ber = ber;
-}
+    double
+    SnrPerTag::GetSNR(void) const {
+        return m_snr;
+    }
 
-double
-SnrPerTag::GetSNR (void) const
-{
-  return m_snr;
-}
+    /*double
+    SnrPerTag::GetPER (void) const
+    {
+      return m_per;
+    }*/
 
-/*double
-SnrPerTag::GetPER (void) const
-{
-  return m_per;
-}*/
-
-double
-SnrPerTag::GetBER (void) const
-{
-  return m_ber;
-}
+    double
+    SnrPerTag::GetBER(void) const {
+        return m_ber;
+    }
 
 
 }

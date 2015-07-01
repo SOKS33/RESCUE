@@ -24,50 +24,46 @@
 
 namespace ns3 {
 
-NS_OBJECT_ENSURE_REGISTERED (RescueMacTrailer);
+    NS_OBJECT_ENSURE_REGISTERED(RescueMacTrailer);
 
-RescueMacTrailer::RescueMacTrailer ()
-{
-}
+    RescueMacTrailer::RescueMacTrailer() {
+    }
 
-RescueMacTrailer::~RescueMacTrailer ()
-{
-}
+    RescueMacTrailer::~RescueMacTrailer() {
+    }
 
-TypeId
-RescueMacTrailer::GetTypeId (void)
-{
-  static TypeId tid = TypeId ("ns3::RescueMacTrailer")
-    .SetParent<Trailer> ()
-    .AddConstructor<RescueMacTrailer> ()
-  ;
-  return tid;
-}
-TypeId
-RescueMacTrailer::GetInstanceTypeId (void) const
-{
-  return GetTypeId ();
-}
+    TypeId
+    RescueMacTrailer::GetTypeId(void) {
+        static TypeId tid = TypeId("ns3::RescueMacTrailer")
+                .SetParent<Trailer> ()
+                .AddConstructor<RescueMacTrailer> ()
+                ;
+        return tid;
+    }
 
-void
-RescueMacTrailer::Print (std::ostream &os) const
-{
-}
-uint32_t
-RescueMacTrailer::GetSerializedSize (void) const
-{
-  return RESCUE_MAC_FCS_LENGTH;
-}
-void
-RescueMacTrailer::Serialize (Buffer::Iterator start) const
-{
-  start.Prev (RESCUE_MAC_FCS_LENGTH);
-  start.WriteU32 (0);
-}
-uint32_t
-RescueMacTrailer::Deserialize (Buffer::Iterator start)
-{
-  return RESCUE_MAC_FCS_LENGTH;
-}
+    TypeId
+    RescueMacTrailer::GetInstanceTypeId(void) const {
+        return GetTypeId();
+    }
+
+    void
+    RescueMacTrailer::Print(std::ostream &os) const {
+    }
+
+    uint32_t
+    RescueMacTrailer::GetSerializedSize(void) const {
+        return RESCUE_MAC_FCS_LENGTH;
+    }
+
+    void
+    RescueMacTrailer::Serialize(Buffer::Iterator start) const {
+        start.Prev(RESCUE_MAC_FCS_LENGTH);
+        start.WriteU32(0);
+    }
+
+    uint32_t
+    RescueMacTrailer::Deserialize(Buffer::Iterator start) {
+        return GetSerializedSize();
+    }
 
 } // namespace ns3

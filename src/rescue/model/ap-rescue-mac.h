@@ -3,7 +3,7 @@
  * Copyright (c) 2015 AGH Univeristy of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
+ * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
  *
  * This program is distributed in the hope that it will be useful,
@@ -35,71 +35,70 @@
 
 namespace ns3 {
 
-class RescuePhy;
-class RescueChannel;
-class LowRescueMac;
-class RescueMacCsma;
-class RescueMacTdma;
-class RescueRemoteStationManager;
-class RescueNetDevice;
+    class RescuePhy;
+    class RescueChannel;
+    class LowRescueMac;
+    class RescueMacCsma;
+    class RescueMacTdma;
+    class RescueRemoteStationManager;
+    class RescueNetDevice;
 
-/**
- * \brief base class for High-Level functionalities of 
- * Decentralised Rescue MAC
- * \ingroup rescue
- */
-class ApRescueMac : public RescueMac
-{
-public:
-  ApRescueMac ();
-  virtual ~ApRescueMac ();
-  static TypeId GetTypeId (void);
- 
-  /**
-   * Clear the transmission queues and pending packets, reset counters.
-   */
-  virtual void Clear (void);
+    /**
+     * \brief base class for High-Level functionalities of
+     * Decentralised Rescue MAC
+     * \ingroup rescue
+     */
+    class ApRescueMac : public RescueMac {
+    public:
+        ApRescueMac();
+        virtual ~ApRescueMac();
+        static TypeId GetTypeId(void);
 
-  /**
-   * \param pkt the packet to send.
-   * \param dest the address to which the packet should be sent.
-   *
-   * The packet should be enqueued in a tx queue, and should be
-   * dequeued as soon as the CSMA determines that
-   * access is granted to this MAC.
-   */
-  virtual void Enqueue (Ptr<Packet> pkt, Mac48Address dest);
-  
-  /**
-   * invoked by ReceivePacketDone to process DATA frames
-   *
-   * \param pkt the received DATA frame
-   * \param phyHdr PHY header associated with the received DATA frame
-   */
-  virtual void ReceivePacket (Ptr<Packet> pkt, RescuePhyHeader phyHdr);   
-  /**
-   * invoked by ReceivePacketDone to process RESOURCE RESERVATION frame
-   *
-   * \param pkt the received RESOURCE RESERVATION frame
-   * \param phyHdr PHY header associated with the received RESOURCE RESERVATION frame
-   */
-  virtual void ReceiveResourceReservation (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
-  /**
-   * invoked by ReceivePacketDone to process BEACON frame
-   *
-   * \param pkt the received BEACON frame
-   * \param phyHdr PHY header associated with the received BEACON frame
-   */
-  virtual void ReceiveBeacon (Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+        /**
+         * Clear the transmission queues and pending packets, reset counters.
+         */
+        virtual void Clear(void);
 
-private:
-  void EndCP ();
-  void GenerateRR ();
-  void SendNow ();
+        /**
+         * \param pkt the packet to send.
+         * \param dest the address to which the packet should be sent.
+         *
+         * The packet should be enqueued in a tx queue, and should be
+         * dequeued as soon as the CSMA determines that
+         * access is granted to this MAC.
+         */
+        virtual void Enqueue(Ptr<Packet> pkt, Mac48Address dest);
 
-protected:
-  virtual void DoInitialize ();
-};
+        /**
+         * invoked by ReceivePacketDone to process DATA frames
+         *
+         * \param pkt the received DATA frame
+         * \param phyHdr PHY header associated with the received DATA frame
+         */
+        virtual void ReceivePacket(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+        /**
+         * invoked by ReceivePacketDone to process RESOURCE RESERVATION frame
+         *
+         * \param pkt the received RESOURCE RESERVATION frame
+         * \param phyHdr PHY header associated with the received RESOURCE RESERVATION frame
+         */
+        virtual void ReceiveResourceReservation(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+        /**
+         * invoked by ReceivePacketDone to process BEACON frame
+         *
+         * \param pkt the received BEACON frame
+         * \param phyHdr PHY header associated with the received BEACON frame
+         */
+        virtual void ReceiveBeacon(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+
+    private:
+        void EndCP();
+        void GenerateRR();
+        void SendNow();
+
+    protected:
+        virtual void DoInitialize();
+    };
 
 }
 
