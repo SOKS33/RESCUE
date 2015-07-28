@@ -232,17 +232,17 @@ int main(int argc, char *argv[]) {
 
     //LogComponentEnable("RescueMacCsma", LOG_LEVEL_INFO); //comment to switch off logging
     //LogComponentEnable("RescueMacCsma", LOG_LEVEL_DEBUG); //comment to switch off logging
-    LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
+    //    LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
 
-    LogComponentEnable("RescueNetDevice", LOG_LEVEL_ALL); //comment to switch off logging
+    //    LogComponentEnable("RescueNetDevice", LOG_LEVEL_ALL); //comment to switch off logging
 
     //LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
-    //LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
-    LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
+    LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
+    //    LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
 
-    LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
+    //    LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("PropagationLossModel", LOG_LEVEL_ALL); //comment to switch off logging
-    LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
+    //    LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("ConstantRateRescueManager", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("RescueHelper", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("BlackBox_no1", LOG_LEVEL_ALL); //comment to switch off logging

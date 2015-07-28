@@ -9,7 +9,7 @@ popd > /dev/null
 
 source common.sh
 
-trap "echo COWARD && exit -12" SIGINT SIGTERM
+trap "echo && echo COWARD && exit -12" SIGINT SIGTERM
 
 #Colors for fun
 
@@ -27,7 +27,7 @@ function printopt {
 	    echo "Usage: ... $#"
 	    exit 1
     else
-	    echo -e "${bpurple}\"--$1\"${default}${bold}"
+	    echo -e "${bpurple}\"--$1\"$<{default}${bold}"
     fi
 }
 draw=0
@@ -103,11 +103,16 @@ fi;
 
 if [[ $real == 1 ]] ; then
     nbruns=10
-    ratelist=(1 2 3 4 5 6 7 8 9 10)
     ratelist=(0.1 0.5 1 1.5 2 2.5 3 4 5 6)
+    #explist=(2 2.53 2.807 2.887 2.953 3.009)
+    #snrlist=(-0.05 -0.45 -0.85 -1.25 -1.65 -2.05 -2.45)
+    explist=(1.6 1.98 2.16 2.382 2.56 2.745 2.859 2.945 3.015 3.076 3.13)
+    snrlist=(-0.01 -0.05 -0.10 -0.25 -0.50 -1.0 -1.5 -2.0 -2.5 -3.0 -3.5)
 else
     nbruns=2
     ratelist=(2 4 8)
+    explist=(1.6 2.745)
+    snrlist=(-0.01 -1.0)
 fi
 
 
@@ -120,45 +125,71 @@ for (( e=0; e < ${#ratelist[@]}; e++ )) ; do
     echo ${ratelist[$e]} >> $res/ratelist.config
 done;
 
+for (( e=0; e < ${#explist[@]}; e++ )) ; do
+    echo ${explist[$e]} >> $res/explist.config
+done;
 
-nbsimu=$(echo ${#ratelist[@]}*$nbruns | bc)
+for (( e=0; e < ${#snrlist[@]}; e++ )) ; do
+    echo ${snrlist[$e]} >> $res/snrlist.config
+done;
+
+
+nbsimu=$(echo ${#explist[@]}*${#ratelist[@]}*$nbruns | bc)
 echo -e "${green}Running $nbsimu simulations ($nbruns for each set of parameters) for both WiFi and RESCUE${default}"
 
 for prefix in "wifi" "rescue" ; do
     simu=1
-    for r in ${ratelist[@]} ; do
-        tmpwd=$PWD
-        cd $prog
-        for run in $(seq 1 $nbruns) ; do
+    expoffset=0
+    for exp in ${explist[@]} ; do
+        for r in ${ratelist[@]} ; do
             tmpwd=$PWD
             cd $prog
-            ret=0
-            try=0
-            until [ $ret -eq 1 ] ; do
-                seed=$(echo "$RANDOM + $try * 10000" | bc)
-                if [[ "$prefix" == "wifi" ]] ; then
-                    ./waf --run "toy5wifi --exponent=0.01 --dataRate=$r --seed=$seed"  > $res/$prefix-$r-$run.tmp 2>&1
-                elif [[ "$prefix" == "rescue" ]] ; then
-                    ./waf --run "toy5 --exponent=0.01 --dataRate=$r --seed=$seed"  > $res/$prefix-$r-$run.tmp 2>&1
-                else
-                    echo "${bred}UNKNOWN PREFIX$ ! ${default}"
-                    exit -1
-                fi
+            for run in $(seq 1 $nbruns) ; do
+                tmpwd=$PWD
+                cd $prog
+                ret=0
+                try=0
+                until [ $ret -eq 1 ] ; do
+                    seed=$(echo "$RANDOM + $try * 10000" | bc)
+                    if [[ "$prefix" == "wifi" ]] ; then
+                        #Skip some wifi simulations
+                        if [[ $expoffset -gt 3 ]] ; then
+                            echo "skip"
+                            echo "100 0 0 0 0 0" >  $res/$prefix-$exp-$r-$run.tmp
+                            echo "PROPER END" >>  $res/$prefix-$exp-$r-$run.tmp
+                        else
+                            ./waf --run "toy5wifi --exponent=$exp --dataRate=$r --seed=$seed"  > $res/$prefix-$exp-$r-$run.tmp 2>&1
+                        fi
 
-                if  grep -q 'PROPER END' $res/$prefix-$r-$run.tmp ; then
-                    echo -e "${green}$simu/$nbsimu ${default}: ${bblue}$prefix${default} dataRate=$r seed=$seed"
-                    ret=1
-                else
-                    echo -e "${red}$simu/$nbsimu ${default}: ${bblue}$prefix${default} dataRate=$r ${red}seed=$seed${default}"
-                fi;
-                ((try++))
-            done;
-            ((simu++))
-            echo "$(tail -n 2 $res/$prefix-$r-$run.tmp | head -n 1)" > $res/$prefix-$r-$run
-            echo "$(tail -n 2 $res/$prefix-$r-$run.tmp | head -n 1)" >> $res/$prefix-$r-all
+                    elif [[ "$prefix" == "rescue" ]] ; then
+                        ./waf --run "toy5 --exponent=$exp --dataRate=$r --seed=$seed"  > $res/$prefix-$exp-$r-$run.tmp 2>&1
+                    else
+                        echo "${bred}UNKNOWN PREFIX$ ! ${default}"
+                        exit -1
+                    fi
+
+                    if [[ $try -eq 4 ]] ; then
+                        echo "FAIL SIMU"
+                        echo "100 0 0 0 0 0 0" >  $res/$prefix-$exp-$r-$run.tmp
+                        echo "PROPER END" >>  $res/$prefix-$exp-$r-$run.tmp
+                    fi
+
+                    if  grep -q 'PROPER END' $res/$prefix-$exp-$r-$run.tmp ; then
+                        echo -e "${green}$simu/$nbsimu ${default}: ${bblue}$prefix${default} exp=$exp dataRate=$r seed=$seed"
+                        ret=1
+                    else
+                        echo -e "${red}$simu/$nbsimu ${default}: ${bblue}$prefix${default} exp=$exp dataRate=$r ${red}seed=$seed${default}"
+                    fi;
+                    ((try++))
+                done;
+                ((simu++))
+                echo "$(tail -n 2 $res/$prefix-$exp-$r-$run.tmp | head -n 1)" > $res/$prefix-$exp-$r-$run
+                echo "$(tail -n 2 $res/$prefix-$exp-$r-$run.tmp | head -n 1)" >> $res/$prefix-$exp-$r-all
+            done
+            cd $tmpwd
+            unset tmpwd
         done
-        cd $tmpwd
-        unset tmpwd
+        ((expoffset++))
     done
     cd $scriptDir
 done

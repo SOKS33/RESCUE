@@ -165,22 +165,24 @@ SimulationHelper::PopulateArpCache() {
 
 void
 EnqueueOkTrace(std::string context, uint32_t node, uint32_t iff, Ptr<const Packet> pkt, const RescueMacHeader &hdr) {
-    //    std::cout << Simulator::Now().GetSeconds() << "\tENQUEUE, TX to: \t" << hdr.GetDestination() << "\t" << *pkt << std::endl;
     m_sentFrames.insert(std::pair<uint64_t, Time> (pkt->GetUid(), Simulator::Now()));
     if (Simulator::Now() > start) {
         m_send++;
+        //        std::cout << Simulator::Now().GetSeconds() << "\tENQUEUE, TX to: \t" << hdr.GetDestination() << "\t" << m_send << " SIZE=" << pkt->GetSize() << std::endl;
+
         m_send_bytes += pkt->GetSize();
     }
 }
 
 void
 DataRxOkTrace(std::string context, uint32_t node, uint32_t iff, Ptr<const Packet> pkt, const RescuePhyHeader &hdr) {
-    //    std::cout << Simulator::Now().GetSeconds() << "\tRX OK, \t\t from: \t" << hdr.GetSource() << "\t" << *pkt << std::endl;
     Packets::iterator it = m_sentFrames.find(pkt->GetUid());
     if (it != m_sentFrames.end()) {
         if (Simulator::Now() > start) {
             Time delay = Simulator::Now() - it->second;
             m_received++;
+            //            std::cout << Simulator::Now().GetSeconds() << "\tRX OK, \t\t from: \t" << hdr.GetSource() << "\t" << m_received << std::endl;
+
             m_received_bytes += pkt->GetSize();
             m_delaySum += delay;
             m_jitterSum += ((m_lastDelay > delay) ? (m_lastDelay - delay) : (delay - m_lastDelay));
@@ -193,13 +195,19 @@ DataRxOkTrace(std::string context, uint32_t node, uint32_t iff, Ptr<const Packet
 uint32_t phy_send = 0, phy_recv = 0;
 
 void
-PhySendTrace(std::string context, uint32_t bs) {
-    phy_send++;
+PhySendTrace(std::string context, Ptr<const Packet> pkt) {
+    if (pkt->GetSize() > 500)
+        phy_send++;
 }
 
+double minSNR = 12.0;
+
 void
-PhyRecvTrace(std::string context, uint32_t bs) {
-    phy_recv++;
+PhyRecvTrace(std::string context, Ptr<const Packet> pkt, double snr) {
+    if (pkt->GetSize() > 500)
+        phy_recv++;
+    minSNR = (minSNR > snr ? snr : minSNR);
+    //    NS_LOG_UNCOND("SNR = " << snr << " min=" << minSNR);
 }
 
 /* =========== Trace functions =========== */
@@ -264,10 +272,10 @@ int main(int argc, char *argv[]) {
     /* =============== Logging =============== */
 
     //LogComponentEnable("RescueMacCsma", LOG_LEVEL_INFO); //comment to switch off logging
-    //LogComponentEnable("RescueMacCsma", LOG_LEVEL_DEBUG); //comment to switch off logging
+    //    LogComponentEnable("RescueMacCsma", LOG_LEVEL_DEBUG); //comment to switch off logging
     //    LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
 
-    //LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
+    //    LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
     //LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
     //LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
 
@@ -556,7 +564,7 @@ int main(int argc, char *argv[]) {
     /* ========== Running simulation ========= */
 
     SimulationHelper::PopulateArpCache();
-    Simulator::Stop(end);
+    Simulator::Stop(end + Seconds(10.0));
     Simulator::Run();
     Simulator::Destroy();
 
@@ -596,26 +604,43 @@ int main(int argc, char *argv[]) {
 
         std::cout << std::endl;
 
+        std::cout << "  Tx Packets: " << flow->second.txPackets << " " << m_send << std::endl;
         std::cout << "  Tx Bytes: " << flow->second.txBytes << std::endl;
-        std::cout << "  Rx Bytes: " << flow->second.rxBytes << std::endl;
-        std::cout << "  Tx Packets: " << flow->second.txPackets << std::endl;
-        std::cout << "  Rx Packets: " << flow->second.rxPackets << std::endl;
-        std::cout << "  Lost Packets: " << flow->second.lostPackets << std::endl;
+        std::cout << "  Enqueued Packets: " << m_send << std::endl;
+        std::cout << "  Enqueued Bytes: " << m_send_bytes << std::endl;
 
-        double lost = 100.0 * flow->second.lostPackets / flow->second.txPackets;
+
+        std::cout << "  Rx Packets: " << flow->second.rxPackets << " " << m_received << std::endl;
+        std::cout << "  Rx Bytes: " << flow->second.rxBytes << std::endl;
+        std::cout << "  Received Packets: " << m_received << std::endl;
+        std::cout << "  Received Bytes: " << m_received_bytes << std::endl;
+
+        std::cout << std::endl;
+        //        std::cout << "  Lost Packets: " << flow->second.lostPackets << std::endl;
+        std::cout << "  Lost Packets: " << m_send - m_received << std::endl;
+
+        //        double lost = 100.0 * flow->second.lostPackets / flow->second.txPackets;
+        double lost = 100.0 * (m_send - m_received) / m_send;
         double delay = (double) (flow->second.delaySum / m_received).GetMicroSeconds() / 1000;
         double jitter = (double) (flow->second.jitterSum / m_received).GetMicroSeconds() / 1000;
-        double throughput = 8000 * (double) flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds();
+        //        double throughput = 8000 * (double) flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds();
+        double throughput = 8000 * (double) m_received_bytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds();
+
         std::cout << "  Lost Packets [%]: " << lost << std::endl;
         std::cout << "  Mean Delay [ms]: " << delay << std::endl;
         std::cout << "  Mean Jitter [ms]: " << jitter << std::endl;
         std::cout << "  Throughput [Mbps]: " << throughput << std::endl;
 
+        std::cout << std::endl;
+        std::cout << "  PHY send : " << phy_send << std::endl;
+        std::cout << "  PHY recv : " << phy_recv << std::endl;
+
         std::cout << lost << " " << delay << " " << jitter << " " << throughput
-                << " " << phy_send << " " << phy_recv << std::endl;
+                << " " << phy_send << " " << phy_recv << " " << 1.0 * m_send / phy_send << std::endl;
     }
 
-    std::cout << "SEND " << phy_send << " RECV " << phy_recv << std::endl;
+    //    std::cout << "SEND " << phy_send << " RECV " << phy_recv << std::endl;
+
     //    std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
     //    std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;
     //    std::cout << "  Tx Packets: " << m_send << std::endl;

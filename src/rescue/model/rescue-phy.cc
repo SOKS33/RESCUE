@@ -311,7 +311,7 @@ namespace ns3 {
         NS_LOG_FUNCTION("");
         m_state = IDLE;
         //MODIF
-        m_traceSend(1);
+        m_traceSend(pkt);
         m_lowMac->SendPacketDone(pkt);
     }
 
@@ -383,7 +383,7 @@ namespace ns3 {
         if ((rxPower > m_rxThr) && (pkt == m_pktRx)) {
 
             //MODIF
-            m_traceRecv(1);
+            m_traceRecv(pkt, sinr);
 
             RescuePhyHeader hdr;
             pkt->RemoveHeader(hdr);
@@ -466,9 +466,10 @@ namespace ns3 {
                                                       mode); //should we modify PER value with by the result of classic error-rate-model?
                     per = 1 - psr;
                     NS_LOG_DEBUG ("PER after last hop: " << per);*/
-
+                    //                    NS_LOG_UNCOND("TAG " << tag.GetSNR());
                     //snr_db.push_back (sinr);
                     //linkPER[0] = per;
+                    NS_LOG_DEBUG("snrdb " << sinr << " LINKBER " << ber);
                     std::vector<double> linkBER;
                     linkBER.push_back(ber);
                     ber = BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBER, //linkPER,

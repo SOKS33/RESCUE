@@ -342,6 +342,7 @@ namespace ns3 {
 
 
     // ----------------------- Queue Functions -----------------------------
+    int dropped = 0;
 
     bool
     RescueMacCsma::Enqueue(Ptr<Packet> pkt, Mac48Address dst) {
@@ -354,7 +355,8 @@ namespace ns3 {
                 " #ackQueue:" << m_ackForwardQueue.size() <<
                 " state:" << StateToString(m_state));
         if (m_pktQueue.size() >= m_queueLimit) {
-            NS_LOG_DEBUG("PACKET QUEUE LIMIT REACHED - DROP FRAME!");
+            dropped++;
+            //            NS_LOG_UNCOND("PACKET QUEUE LIMIT REACHED - DROP FRAME! " << dropped);
             return false;
         }
 

@@ -246,16 +246,25 @@ void DataRxOkTrace3(std::string context, Ptr<const Packet> pkt) {
 
 }
 
-void TxTraceIP(const Ipv4Header &hdr, Ptr<const Packet> pkt) {
-    NS_LOG_UNCOND("TX ");
+uint32_t ip_send = 0, ip_recv = 0;
+
+void TxTraceIP(std::string context, const Ipv4Header &hdr, Ptr<const Packet> pkt, uint32_t foo) {
+    std::ostringstream os;
+    hdr.Print(os);
+    if (pkt->GetSize() > 800) {
+        //        std::cout << Simulator::Now().GetSeconds() << os.str() << " size=" << pkt->GetSize() << " " << ip_send << std::endl;
+
+        ip_send++;
+    }
 }
 
-void RxTraceIP(const Ipv4Header &hdr, Ptr<const Packet> pkt) {
-    NS_LOG_UNCOND("RX ");
+void RxTraceIP(std::string context, const Ipv4Header &hdr, Ptr<const Packet> pkt, uint32_t foo) {
+    if (pkt->GetSize() > 800)
+        ip_recv++;
 }
 
 
-uint32_t phy_send = 0, phy_recv = 0;
+uint32_t phy_send = 0, phy_recv = 0, app_send = 0, phy_send_src = 0;
 
 void
 PhySendTrace(std::string context, Ptr<const Packet> pkt) {
@@ -264,9 +273,21 @@ PhySendTrace(std::string context, Ptr<const Packet> pkt) {
 }
 
 void
+PhySendTraceSrc(std::string context, Ptr<const Packet> pkt) {
+    if (pkt->GetSize() > 500)
+        phy_send_src++;
+}
+
+void
 PhyRecvTrace(std::string context, Ptr<const Packet> pkt) {
     if (pkt->GetSize() > 500)
         phy_recv++;
+}
+
+void
+TxApplication(std::string context, Ptr<const Packet> pkt) {
+    if (pkt->GetSize() > 500)
+        app_send++;
 }
 
 /* =========== Trace functions =========== */
@@ -384,8 +405,6 @@ int main(int argc, char *argv[]) {
     end = Seconds(simTime);
     start = Seconds(calcStart);
 
-
-
     /* ============ Nodes creation =========== */
     NodeContainer nodes;
     nodes.Create(2);
@@ -492,7 +511,7 @@ int main(int argc, char *argv[]) {
     onOffHelper.SetConstantRate(dataRate, dataSize);
     onOffHelper.SetAttribute("MaxBytes", UintegerValue(packetLimit * dataSize));
     onOffHelper.SetAttribute("StartTime", TimeValue(Seconds(10.0)));
-    onOffHelper.SetAttribute("StopTime", TimeValue(Seconds(end)));
+    onOffHelper.SetAttribute("StopTime", TimeValue(end));
     //onOffHelper.SetAttribute ("RandSendTimeLimit", UintegerValue (random)); //packets generation times modified by random value between -50% and + 50% of constant time step between packets
     onOffHelper.Install(nodes.Get(0));
 
@@ -501,17 +520,18 @@ int main(int argc, char *argv[]) {
 
     /* =========== Trace Connections ========= */
 
-    Config::Connect("/NodeList/*/DeviceList/*/Mac/MacTx", MakeCallback(&EnqueueOkTrace2));
+    Config::Connect("/NodeList/0/DeviceList/*/Mac/MacTx", MakeCallback(&EnqueueOkTrace2));
     Config::Connect("/NodeList/*/DeviceList/*/Mac/MacRx", MakeCallback(&DataRxOkTrace2));
     Config::Connect("/NodeList/*/DeviceList/*/Mac/MacPromiscRx", MakeCallback(&DataRxOkTrace3));
 
     Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyTxBegin", MakeCallback(&PhySendTrace));
+    Config::Connect("/NodeList/0/DeviceList/*/Phy/PhyTxBegin", MakeCallback(&PhySendTraceSrc));
     Config::Connect("/NodeList/*/DeviceList/*/Phy/PhyRxEnd", MakeCallback(&PhyRecvTrace));
 
+    Config::Connect("/NodeList/*/$ns3::Ipv4L3Protocol/SendOutgoing", MakeCallback(&TxTraceIP));
+    Config::Connect("/NodeList/*/$ns3::Ipv4L3Protocol/LocalDeliver", MakeCallback(&RxTraceIP));
 
-    Config::Connect("/NodeList/*/Ipv4L3Protocol/Tx", MakeCallback(&TxTraceIP));
-    Config::Connect("/NodeList/*/Ipv4L3Protocol/Rx", MakeCallback(&RxTraceIP));
-
+    Config::Connect("/NodeList/*/ApplicationList/*/$ns3::OnOffApplication/Tx", MakeCallback(&TxApplication));
     /* ============= Flow Monitor ============ */
 
     FlowMonitorHelper flowmon_helper;
@@ -524,7 +544,7 @@ int main(int argc, char *argv[]) {
     /* ========== Running simulation ========= */
 
     SimulationHelper::PopulateArpCache();
-    Simulator::Stop(end);
+    Simulator::Stop(end + Seconds(10.0));
     Simulator::Run();
     Simulator::Destroy();
 
@@ -555,6 +575,7 @@ int main(int argc, char *argv[]) {
                 << t.destinationAddress << "/" << t.destinationPort << ")" <<
                 std::endl;
 
+
         std::cout << "timeFirstTxPacket:" << flow->second.timeFirstTxPacket.GetSeconds() << std::endl;
         std::cout << "timeFirstRxPacket:" << flow->second.timeFirstRxPacket.GetSeconds() << std::endl;
         std::cout << "timeLastTxPacket:" << flow->second.timeLastTxPacket.GetSeconds() << std::endl;
@@ -562,12 +583,24 @@ int main(int argc, char *argv[]) {
 
         std::cout << std::endl;
 
-        std::cout << "  Tx Bytes: " << flow->second.txBytes << std::endl;
-        std::cout << "  Rx Bytes: " << flow->second.rxBytes << std::endl;
         std::cout << "  Tx Packets: " << flow->second.txPackets << std::endl;
+        std::cout << "  Tx Bytes: " << flow->second.txBytes << std::endl;
+        std::cout << "  Enqueued Packets: " << m_send << std::endl;
+        std::cout << "  Enqueued Bytes: " << m_send_bytes << std::endl;
+
+
         std::cout << "  Rx Packets: " << flow->second.rxPackets << std::endl;
+        std::cout << "  Rx Bytes: " << flow->second.rxBytes << std::endl;
+        std::cout << "  Received Packets: " << m_received << std::endl;
+        std::cout << "  Received Bytes: " << m_received_bytes << std::endl;
+
+
+        std::cout << "IP : " << ip_send << " " << ip_recv << std::endl;
+
+
         std::cout << "  Lost Packets: " << flow->second.lostPackets << std::endl;
 
+        double lost2 = 100.0 * (m_send - m_received) / m_send;
         double lost = 100.0 * flow->second.lostPackets / flow->second.txPackets;
         double delay = (double) (flow->second.delaySum / m_received).GetMicroSeconds() / 1000;
         double jitter = (double) (flow->second.jitterSum / m_received).GetMicroSeconds() / 1000;
@@ -577,9 +610,12 @@ int main(int argc, char *argv[]) {
         std::cout << "  Mean Jitter [ms]: " << jitter << std::endl;
         std::cout << "  Throughput [Mbps]: " << throughput << std::endl;
 
-        std::cout << lost << " " << delay << " " << jitter << " " << throughput
-                << " " << phy_send << " " << phy_recv << std::endl;
+        std::cout << lost2 << " " << delay << " " << jitter << " " << throughput
+                << " " << phy_send << " " << phy_recv << " " << 1.0 * m_send / phy_send << std::endl;
+
     }
+    //    std::cout << "APP SEND " << app_send << " " << phy_send_src << std::endl;
+
     //    std::cout << "SEND " << phy_send << " RECV " << phy_recv << std::endl;
     //
     //    std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
