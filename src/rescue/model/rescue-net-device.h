@@ -30,6 +30,7 @@
 namespace ns3 {
 
     class RescueRemoteStationManager;
+    class RescueArqManager;
     class RescueChannel;
     class RescuePhy;
     class RescueMac;
@@ -45,7 +46,8 @@ namespace ns3 {
      * \ingroup rescue
      *
      * This class holds together ns3::RescueChannel, ns3::RescuePhy,
-     * ns3::RescueMac, ns3::LowRescueMac, and, ns3::RescueRemoteStationManager.
+     * ns3::RescueMac, ns3::LowRescueMac,
+     * ns3::RescueRemoteStationManager and ns3::RescueArqManager
      */
     class RescueNetDevice : public NetDevice {
     public:
@@ -79,15 +81,15 @@ namespace ns3 {
          * \param manager the manager to use.
          */
         void SetRemoteStationManager(Ptr<RescueRemoteStationManager> manager);
+        /**
+         * \param arqManager the ARQ manager to use.
+         */
+        void SetArqManager(Ptr<RescueArqManager> arqManager);
 
         /**
          * \return pointer to used HI-MAC
          */
         Ptr<RescueMac> GetMac(void) const;
-        /**
-         * \return pointer to used lower MAC
-         */
-        //Ptr<RescueMac> GetLowMac (void) const;
         /**
          * \return pointer to used PHY
          */
@@ -96,6 +98,10 @@ namespace ns3 {
          * \returns the remote station manager we are currently using.
          */
         Ptr<RescueRemoteStationManager> GetRemoteStationManager(void) const;
+        /**
+         * \returns the ARQ manager we are currently using.
+         */
+        Ptr<RescueArqManager> GetArqManager(void) const;
 
 
         // Purely virtual functions from base class
@@ -142,9 +148,9 @@ namespace ns3 {
         Ptr<Node> m_node; //<! pointer to associated ns-3 node
         Ptr<RescueChannel> m_channel; //<! Pointer to RescueChannel
         Ptr<RescueMac> m_mac; //!< Pointer to RescueMac
-        //Ptr<RescueMac> m_lowMac;                          //!< Pointer to RescueMac
         Ptr<RescuePhy> m_phy; //!< Pointer to RescuePhy
-        Ptr<RescueRemoteStationManager> m_stationManager; //!< Pointer to WifiRemoteStationManager (rate control)
+        Ptr<RescueRemoteStationManager> m_stationManager; //!< Pointer to RescueRemoteStationManager (rate control)
+        Ptr<RescueArqManager> m_arqManager; //!< Pointer to RescueArqManager (advanced ARQ control)
 
         uint32_t m_ifIndex;
         uint16_t m_mtu;

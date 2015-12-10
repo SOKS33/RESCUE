@@ -17,9 +17,7 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on ns-3 wifi module by:
- * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
 #include "ns3/address-utils.h"
@@ -37,7 +35,9 @@ namespace ns3 {
 
     RescuePhyHeader::RescuePhyHeader(uint8_t type)
     : Header(),
-    m_type(type) {
+    m_type(type),
+    m_srcAddr(Mac48Address("00:00:00:00:00:00")),
+    m_dstAddr(Mac48Address("00:00:00:00:00:00")) {
     }
 
     RescuePhyHeader::RescuePhyHeader(const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type)
@@ -91,17 +91,6 @@ namespace ns3 {
     m_sequence(seq),
     m_mbf(mbf),
     m_interleaver(il) {
-    }
-
-    RescuePhyHeader::RescuePhyHeader(const Mac48Address srcAddr, const Mac48Address dstAddr,
-            uint8_t type, uint16_t blockAck, uint8_t contAck, uint16_t seq)
-    : Header(),
-    m_type(type),
-    m_duration(blockAck),
-    m_beaconRep(contAck),
-    m_srcAddr(srcAddr),
-    m_dstAddr(dstAddr),
-    m_sequence(seq) {
     }
 
     RescuePhyHeader::RescuePhyHeader(const Mac48Address srcAddr,
@@ -176,27 +165,27 @@ namespace ns3 {
     }
 
     void
-    RescuePhyHeader::SetBlockAckSupported(void) {
-        m_bAck = 1;
+    RescuePhyHeader::SetBlockAckEnabled(void) {
+        m_useBlockAck = 1;
     }
 
     void
     RescuePhyHeader::SetBlockAckDisabled(void) {
-        m_bAck = 0;
+        m_useBlockAck = 0;
     }
 
     void
-    RescuePhyHeader::SetContinousAckSupported(void) {
-        m_continousAck = 1;
+    RescuePhyHeader::SetContinousAckEnabled(void) {
+        m_useContinousAck = 1;
     }
 
     void
     RescuePhyHeader::SetContinousAckDisabled(void) {
-        m_continousAck = 0;
+        m_useContinousAck = 0;
     }
 
     void
-    RescuePhyHeader::SetQosSupported(void) {
+    RescuePhyHeader::SetQosEnabled(void) {
         m_qos = 1;
     }
 
@@ -261,8 +250,8 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_DATA:
                 m_dataRate = (ctrl >> 3) & 0x03;
                 m_sendWindow = (ctrl >> 5) & 0x0f;
-                m_bAck = (ctrl >> 9) & 0x01;
-                m_contAck = (ctrl >> 10) & 0x01;
+                m_useBlockAck = (ctrl >> 9) & 0x01;
+                m_useContinousAck = (ctrl >> 10) & 0x01;
                 m_qos = (ctrl >> 11) & 0x01;
                 m_macProtocol = (ctrl >> 12) & 0x01;
                 m_retry = (ctrl >> 13) & 0x01;
@@ -270,9 +259,9 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
                 m_nACK = (ctrl >> 3) & 0x01;
                 m_sendWindow = (ctrl >> 4) & 0x0f;
-                m_bAck = (ctrl >> 8) & 0x01;
-                m_contAck = (ctrl >> 9) & 0x01;
-                m_NACKedFrames = (ctrl >> 10) & 0x0f;
+                m_useBlockAck = (ctrl >> 8) & 0x01;
+                m_useContinousAck = (ctrl >> 9) & 0x01;
+                m_NACKedFrames = (ctrl >> 10) & 0x1f;
                 break;
             case RESCUE_PHY_PKT_TYPE_PART_ACK:
                 //currently not suported
@@ -287,8 +276,8 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_RR:
                 m_dataRate = (ctrl >> 3) & 0x03;
                 m_sendWindow = (ctrl >> 5) & 0x0f;
-                m_bAck = (ctrl >> 9) & 0x01;
-                m_contAck = (ctrl >> 10) & 0x01;
+                m_useBlockAck = (ctrl >> 9) & 0x01;
+                m_useContinousAck = (ctrl >> 10) & 0x01;
                 m_qos = (ctrl >> 11) & 0x01;
                 m_nextDataRate = (ctrl >> 12) & 0x03;
                 break;
@@ -311,8 +300,17 @@ namespace ns3 {
     }
 
     void
+    RescuePhyHeader::SetBlockAckFlagFor(bool received, uint8_t frameNumber) {
+        if (received)
+            m_blockAck[frameNumber] = 1;
+        else
+            m_blockAck[frameNumber] = 0;
+    }
+
+    void
     RescuePhyHeader::SetBlockAck(uint16_t blockAck) {
-        m_blockAck = blockAck;
+        for (int i = 0; i < 16; i++)
+            m_blockAck[i] = (blockAck >> i) & 0x01;
     }
 
     void
@@ -431,17 +429,17 @@ namespace ns3 {
     }
 
     bool
-    RescuePhyHeader::IsBlockAckSupported(void) const {
-        return (m_bAck == 1);
+    RescuePhyHeader::IsBlockAckEnabled(void) const {
+        return (m_useBlockAck == 1);
     }
 
     bool
-    RescuePhyHeader::IsContinousAckSupported(void) const {
-        return (m_continousAck == 1);
+    RescuePhyHeader::IsContinousAckEnabled(void) const {
+        return (m_useContinousAck == 1);
     }
 
     bool
-    RescuePhyHeader::IsQosSupported(void) const {
+    RescuePhyHeader::IsQosEnabled(void) const {
         return (m_qos == 1);
     }
 
@@ -492,8 +490,8 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_DATA:
                 val |= (m_dataRate << 3) & (0x03 << 3);
                 val |= (m_sendWindow << 5) & (0x0f << 5);
-                val |= (m_bAck << 9) & (0x01 << 9);
-                val |= (m_contAck << 10) & (0x01 << 10);
+                val |= (m_useBlockAck << 9) & (0x01 << 9);
+                val |= (m_useContinousAck << 10) & (0x01 << 10);
                 val |= (m_qos << 11) & (0x01 << 11);
                 val |= (m_macProtocol << 12) & (0x01 << 12);
                 val |= (m_retry << 13) & (0x01 << 13);
@@ -501,9 +499,9 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
                 val |= (m_nACK << 3) & (0x01 << 3);
                 val |= (m_sendWindow << 4) & (0x0f << 4);
-                val |= (m_bAck << 8) & (0x01 << 8);
-                val |= (m_contAck << 9) & (0x01 << 9);
-                val |= (m_NACKedFrames << 10) & (0x0f << 10);
+                val |= (m_useBlockAck << 8) & (0x01 << 8);
+                val |= (m_useContinousAck << 9) & (0x01 << 9);
+                val |= (m_NACKedFrames << 10) & (0x1f << 10);
                 break;
             case RESCUE_PHY_PKT_TYPE_PART_ACK:
                 //currently not supported
@@ -518,8 +516,8 @@ namespace ns3 {
             case RESCUE_PHY_PKT_TYPE_RR:
                 val |= (m_dataRate << 3) & (0x03 << 3);
                 val |= (m_sendWindow << 5) & (0x0f << 5);
-                val |= (m_bAck << 9) & (0x01 << 9);
-                val |= (m_contAck << 10) & (0x01 << 10);
+                val |= (m_useBlockAck << 9) & (0x01 << 9);
+                val |= (m_useContinousAck << 10) & (0x01 << 10);
                 val |= (m_qos << 11) & (0x01 << 11);
                 val |= (m_nextDataRate << 12) & (0x03 << 12);
                 break;
@@ -542,12 +540,20 @@ namespace ns3 {
         return m_beaconRep;
     }
 
-    uint8_t
-    RescuePhyHeader::GetBlockAck(void) const {
-        return m_blockAck;
+    bool
+    RescuePhyHeader::IsBlockAckFrameReceived(uint8_t frameNumber) const {
+        return (m_blockAck[frameNumber] == 1);
     }
 
     uint16_t
+    RescuePhyHeader::GetBlockAck(void) const {
+        uint16_t val = 0;
+        for (int i = 0; i < 16; i++)
+            val |= (m_blockAck[i] << i) & (0x01 << i);
+        return val;
+    }
+
+    uint8_t
     RescuePhyHeader::GetContinousAck(void) const {
         return m_continousAck;
     }
@@ -617,24 +623,19 @@ namespace ns3 {
         uint32_t size = 0;
         switch (m_type) {
             case RESCUE_PHY_PKT_TYPE_DATA:
-                size = 2 +
-                        //sizeof (m_type) +
-                        //sizeof (m_dataRate) +
+                size = sizeof (uint16_t) + //frame control
                         sizeof (m_duration) +
                         sizeof (Mac48Address) * 3 +
                         sizeof (m_sequence) +
                         sizeof (m_mbf) +
                         sizeof (m_interleaver) +
-                        //sizeof (m_qos) +
                         sizeof (m_checksum);
                 if (m_macProtocol == 1)
                     size += sizeof (m_beaconRep);
                 break;
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
-                size = 2 +
-                        //sizeof (m_type) +
-                        //sizeof (m_subtype) +
-                        sizeof (m_blockAck) +
+                size = sizeof (uint16_t) + //frame control
+                        sizeof (uint16_t) + //blockAck
                         sizeof (m_continousAck) +
                         sizeof (Mac48Address) * 2 +
                         sizeof (m_sequence) +
@@ -644,7 +645,7 @@ namespace ns3 {
                 //currently not supported
                 break;
             case RESCUE_PHY_PKT_TYPE_B:
-                size = 2 +
+                size = sizeof (uint16_t) + //frame control
                         sizeof (m_timestamp) +
                         sizeof (Mac48Address) +
                         sizeof (m_beaconInterval) +
@@ -654,16 +655,13 @@ namespace ns3 {
                         sizeof (m_checksum);
                 break;
             case RESCUE_PHY_PKT_TYPE_RR:
-                size = 2 +
-                        //sizeof (m_type) +
-                        //sizeof (m_dataRate) +
+                size = sizeof (uint16_t) + //frame control
                         sizeof (m_duration) +
                         sizeof (m_nextDuration) +
                         sizeof (Mac48Address) * 2 +
                         sizeof (m_sequence) +
                         sizeof (m_mbf) +
                         sizeof (m_interleaver) +
-                        //sizeof (m_qos) +
                         sizeof (m_checksum);
                 break;
                 break;
@@ -683,7 +681,6 @@ namespace ns3 {
     void
     RescuePhyHeader::Serialize(Buffer::Iterator i) const {
         i.WriteU16(GetFrameControl());
-        //i.WriteHtolsbU16 (m_duration);
         switch (m_type) {
             case RESCUE_PHY_PKT_TYPE_DATA:
                 i.WriteU16(m_duration);
@@ -695,10 +692,9 @@ namespace ns3 {
                 i.WriteU16(m_sequence);
                 i.WriteU16(m_mbf);
                 i.WriteU8(m_interleaver);
-                //i.WriteU8 (m_qos);
                 break;
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
-                i.WriteU16(m_blockAck);
+                i.WriteU16(GetBlockAck());
                 i.WriteU8(m_continousAck);
                 WriteTo(i, m_srcAddr);
                 WriteTo(i, m_dstAddr);
@@ -724,7 +720,6 @@ namespace ns3 {
                 i.WriteU16(m_sequence);
                 i.WriteU16(m_mbf);
                 i.WriteU8(m_interleaver);
-                //i.WriteU8 (m_qos);
                 break;
         }
         i.WriteU32(m_checksum);
@@ -736,21 +731,22 @@ namespace ns3 {
 
         uint16_t frame_control = i.ReadU16();
         SetFrameControl(frame_control);
+        uint16_t block_ack;
         switch (m_type) {
             case RESCUE_PHY_PKT_TYPE_DATA:
                 m_duration = i.ReadU16();
                 if (m_macProtocol == 1)
-                    m_duration = i.ReadU32();
+                    m_beaconRep = i.ReadU32();
                 ReadFrom(i, m_srcAddr);
                 ReadFrom(i, m_senderAddr);
                 ReadFrom(i, m_dstAddr);
                 m_sequence = i.ReadU16();
                 m_mbf = i.ReadU16();
                 m_interleaver = i.ReadU8();
-                //m_qos = i.ReadU8 ();
                 break;
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
-                m_blockAck = i.ReadU16();
+                block_ack = i.ReadU16();
+                SetBlockAck(block_ack);
                 m_continousAck = i.ReadU8();
                 ReadFrom(i, m_srcAddr);
                 ReadFrom(i, m_dstAddr);
@@ -776,7 +772,6 @@ namespace ns3 {
                 m_sequence = i.ReadU16();
                 m_mbf = i.ReadU16();
                 m_interleaver = i.ReadU8();
-                //m_qos = i.ReadU8 ();
                 break;
         }
         m_checksum = i.ReadU32();

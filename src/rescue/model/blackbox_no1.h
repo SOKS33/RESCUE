@@ -10,14 +10,14 @@
 
 namespace ns3 {
 
-    class OutputBlackBox_no1 {
+    class OutputBlackbox_no1 {
     public:
-        double ber; // bit error probability
-        double mi; // Equivalent mutual information
-        double p_floor; // error floor
+        double m_ber; // bit error probability
+        double m_mi; // Equivalent mutual information
+        double m_p_floor; // error floor
     };
 
-    const double capacity_table[] ={0.000228074055137, 0.000255898363145, 0.000287116472577, 0.000322142159166, 0.000361439601359, 0.000405529508247, 0.000454995989498,
+    const double capacity_table[] = {0.000228074055137, 0.000255898363145, 0.000287116472577, 0.000322142159166, 0.000361439601359, 0.000405529508247, 0.000454995989498,
         0.000510494256346, 0.000572759253196, 0.000642615331042, 0.000720987086898, 0.000808911507812, 0.000907551574003, 0.001018211493327,
         0.001142353758787, 0.001281618242307, 0.001437843561665, 0.001613090983410, 0.001809671152934, 0.002030173973783, 0.002277501991710,
         0.002554907675103, 0.002866035022045, 0.003214965965371, 0.003606272090353, 0.004045072224639, 0.004537096506248, 0.005088757581712,
@@ -36,11 +36,6 @@ namespace ns3 {
         1.999998296783124, 1.999999651268849, 1.999999940842711, 1.999999991873342, 1.999999999118798, 1.999999999926724, 1.999999999995483,
         1.999999999999811, 2.000000000000000}; // length: 121
 
-    /**
-     * \ingroup rescue
-     *
-     * Implements the BlackBox_no1
-     */
     class BlackBox_no1 : public Object {
     public:
         static TypeId GetTypeId(void);
@@ -48,100 +43,54 @@ namespace ns3 {
         BlackBox_no1();
         virtual ~BlackBox_no1();
 
-        /**
+        /*
          * Calculate mutual information (MI) metric and bit error probability (p) at a receiving node
          * - combined over multiple received copies (different coding for each, but same code rate)
          * - constellation constrained MI used
          * - normalized with spectral efficiency (information bit level)
          * - in theory MI per information bit is perfect when it is unity, but the metric here can get higher values
          * - bit error probability calculated based on rate-distortion theory, and further lower bounded by error-floor calculation (as derived by TUD)
-         *
+
          * References
          * - D2.1.1 Interim Report of Detailed Coding/Decoding Algorithms and Correlation Estimation Techniques
          * - Xiaobo Zhou, Meng Cheng, Xin He, and Tad Matsumoto. "Exact and Approximated Outage Probability Analyses
          * for Decode-and-Forward Relaying System Allowing Intra-link Errors". In: IEEE Trans. Wireless Commun. 2014.
          *
-         * \param snr_db [num_links] SNR (instantaneous Es/N0 at the receiver side, includes the channel fading state) per complex symbol for each link in dB
-         * \param linkPER [num_links] packet error probability at each transmitter, range 0.0...0.5
-         * \param constellationSize [scalar] constellation size: 2=BPSK, 4=QPSK, 16=16QAM
-         * \param spectralEfficiency [scalar] number of information bits per complex symbol (affected by code rate and constellation size)
-         *                                    used for normalization purposes only
-         * \param packetLength [scalar] length of packet in bits
+         * Inputs [dimensions]
+         * - SNR_dB [num_links] SNR (instantaneous Es/N0 at the receiver side, includes the channel fading state) per complex symbol for each link in dB
+         * - linkPER [num_links] packet error probability at each transmitter, range 0.0...0.5
+         * - constellation_size [scalar] 2=BPSK, 4=QPSK, 16=16QAM
+         * - spectral_efficiency [scalar] number of information bits per complex symbol (affected by code rate and constellation size)
+         *   used for normalization purposes only
          *
-         * \return packet error probability at receiver joint decoder output, range 0.0...1.0
+         * Calculate the bit error rate. Every link has its own constellationSize and spectralEfficiency
          */
-        static double CalculateRescuePacketErrorRate(std::vector<double> snr_db, std::vector<double> linkPacketER, int constellationSize, double spectralEfficiency, int packetLength);
+        static void CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, OutputBlackbox_no1 & outbl_no1);
 
-        /**
-         *  Calculate the bit error rate (is the same as the function above with packetLength=1)
+        /*
+         *  Calculate the bit error rate
+         *  outbl_no1 = {ber, mi, p_floor}
+         */
+        static void CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency, OutputBlackbox_no1 & outbl_no1);
+
+        /*
+         *  Calculate the bit error rate
+         *  outbl_no1 = {ber, mi, p_floor}
          */
         static double CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency);
 
-        /**
-         *  Calculate the bit error rate (is the same as the function above with packetLength=1)
+        /*
+         *  Aggregate the bit error probabilities ber* = ber1*(1-ber2) + (1-ber1)*ber2
          */
-        static void CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency, OutputBlackBox_no1 & outbl_no1);
-
-        /**
-         * Calculate the bit error rate. Every link has its own constellationSize and spectralEfficiency
-         */
-        static double CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency);
-
-        /**
-         * Calculate the bit error rate. Every link has its own constellationSize and spectralEfficiency
-         */
-        static void CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, OutputBlackBox_no1 & outbl_no1);
-
-        /**
-         * Calculate the bit error rate. Every link has its own constellationSize and spectralEfficiency
-         */
-        static double CalculateRescuePacketErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, int packetLength);
-
-        /**
-         *  Aggregate the bit error probabilities p* = p1*(1-p2) + (1-p1)*p2
-         */
-        static double BinaryConvolution(double p1, double p2, int packetLength);
-
-        /**
-         * Convert packet error rate to bit error rate
-         *
-         * \param linkPER [num_links] packet error probability at each transmitter, range 0.0...0.5
-         * \param packetLength length of packet in bits
-         *
-         * \return bit error rate (BER)
-         */
-        static std::vector<double> PERtoBER(std::vector<double> linkPER, int packetLength);
-        /**
-         * Convert packet error rate to bit error rate
-         *
-         * \param per packet error probability
-         * \param packetLength length of packet in bits
-         *
-         * \return bit error rate (BER)
-         */
-        static double PERtoBER(double per, int packetLength);
-
-        /**
-         * Convert bit error rate to packet error rate
-         *
-         * \param ber packet error probability at each transmitter, range 0.0...0.5
-         * \param packetLength length of packet in bits
-         *
-         * \return packet error rate (PER)
-         */
-        static double BERtoPER(double ber, int packetLength);
+        static double BinaryConvolution(double ber1, double ber2);
 
     private:
-        /**
+        /*
          * Lookup for constellationSize 2 and 4
-         *
-         * \param sigma input for J-function
-         *
-         * \return the result of J-function calculation
          */
         static double J_Function(double sigma);
 
-        /**
+        /*
          * Read the four-PAM-capacity table for a given SNR
          * Table includes capacity values for SNRs from -35 to 25 dB with 0.5dB granularity
          *
@@ -150,52 +99,37 @@ namespace ns3 {
          *
          * Outputs [dimensions]
          * - c [num_links] four-PAM-capacity for each link
-         *
-         * \param snr_dB [num_links] SNR (instantaneous Es/N0 at the receiver side, includes the channel fading state) per complex symbol for each link in dB
-         *
-         * \return four-PAM-capacity for each link
          */
         static double Four_Pam_Capacity_Table_Lookup(double snr_DB);
 
-        /**
+        /*
          * Inverse of the (increasing) binary entropy function
-         * \f$ H(p) = -p*log_2(p) - (1-p)*log_2(1-p)\f$, where p = 0.0...0.5
+         * H(p) = -p*log2(p) - (1-p)*log2(1-p), where p = 0.0...0.5
          * Input x should be scalar and between 0...1 (inputs outside range truncated back to range)
          * Algorithm: find p such that x-H(p)=0 via bisection.
          * Output p is in the range from 0.0 to 0.5
-         *
-         * \param x scalar between 0...1 (inputs outside range truncated back to range)
-         *
-         * \return p in the range from 0.0 to 0.5
          */
         static double InvH(double x);
 
-        /**
+        /*
          * Calculate error floor at receiving node
          * - Based on bit error probabilities at parallel transmitters (relays)
          * - Formula derived by TUD
          * - Error floor equals to zero if there is at least one zero TX error probability
-         *
+
          * Inputs [dimensions]
          * - p_tx [num_links] bit error probability at each transmitter, range 0.0...0.5
-         *
+
          * Outputs [dimensions]
          * - p_floor [scalar] error probability at destination assuming infinite SNR for all links
-         *
-         * \param p_tx bit error probability at each transmitter, range 0.0...0.5
-         *
-         * \return error probability at destination assuming infinite SNR for all links
          */
         static double ErrorFloor(std::vector<double> p_tx);
 
-        /**
+        /*
          * Helper function to create the bit divisor vector
-         *
-         * \param numberLinks number of links 1, 2, 4, 8, 16, ...)
-         *
-         * \return bit divisor vector
          */
         static std::vector<double> GenerateBitDivisor(int numberLinks); //(1, 2, 4, 8, 16, ...)
+
     };
 
 }

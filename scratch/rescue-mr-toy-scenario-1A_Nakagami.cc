@@ -35,10 +35,8 @@
 #include "ns3/mobility-module.h"
 #include "ns3/internet-module.h"
 #include "ns3/applications-module.h"
-#include "ns3/flow-monitor-module.h"
+//#include "ns3/flow-monitor-module.h"
 #include "ns3/rng-seed-manager.h"
-
-#include "ns3/olsr-module.h"
 
 #include "ns3/rescue-channel.h"
 #include "ns3/adhoc-rescue-mac-helper.h"
@@ -207,7 +205,6 @@ int main(int argc, char *argv[]) {
     double TxPower = 20;
     double BerThr = 0.2;
     bool useLOTF = true;
-    bool useBB2 = false;
 
     uint32_t cwMin = 16;
     uint32_t cwMax = 1024;
@@ -232,17 +229,15 @@ int main(int argc, char *argv[]) {
 
     //LogComponentEnable("RescueMacCsma", LOG_LEVEL_INFO); //comment to switch off logging
     //LogComponentEnable("RescueMacCsma", LOG_LEVEL_DEBUG); //comment to switch off logging
-    //    LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
-
-    //    LogComponentEnable("RescueNetDevice", LOG_LEVEL_ALL); //comment to switch off logging
+    //LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL); //comment to switch off logging
 
     //LogComponentEnable("RescuePhy", LOG_LEVEL_INFO); //comment to switch off logging
-    LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
-    //    LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
+    //LogComponentEnable("RescuePhy", LOG_LEVEL_DEBUG); //comment to switch off logging
+    //LogComponentEnable("RescuePhy", LOG_LEVEL_ALL); //comment to switch off logging
 
-    //    LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
+    //LogComponentEnable("RescueChannel", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("PropagationLossModel", LOG_LEVEL_ALL); //comment to switch off logging
-    //    LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
+    //LogComponentEnable("RescueRemoteStationManager", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("ConstantRateRescueManager", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("RescueHelper", LOG_LEVEL_ALL); //comment to switch off logging
     //LogComponentEnable("BlackBox_no1", LOG_LEVEL_ALL); //comment to switch off logging
@@ -270,7 +265,6 @@ int main(int argc, char *argv[]) {
     cmd.AddValue("TxPower", "Transmission Power [dBm]", TxPower);
     cmd.AddValue("BerThr", "BER threshold - frames with higher BER are unusable for reconstruction purposes and should not be stored or forwarded (default value = 0.5)", BerThr);
     cmd.AddValue("useLOTF", "Use Links-on-the-Fly", useLOTF);
-    cmd.AddValue("useBB2", "Use BlackBox #2 for error calculations", useBB2);
 
     cmd.AddValue("cwMin", "Minimum value of CW", cwMin);
     cmd.AddValue("cwMax", "Maximum value of CW", cwMax);
@@ -303,6 +297,7 @@ int main(int argc, char *argv[]) {
     nodes.Create(2);
     NodeContainer relayNode;
     relayNode.Create(1);
+
 
 
     /* ======== Positioning / Mobility ======= */
@@ -364,8 +359,7 @@ int main(int argc, char *argv[]) {
             "RxPowerThr", DoubleValue(RxPowerThr),
             "TxPower", DoubleValue(TxPower),
             "BerThr", DoubleValue(BerThr),
-            "UseLOTF", BooleanValue(useLOTF),
-            "UseBB2", BooleanValue(useBB2));
+            "UseLOTF", BooleanValue(useLOTF));
 
     AdhocRescueMacHelper rescueMac = AdhocRescueMacHelper::Default();
     rescueMac.SetType("ns3::AdhocRescueMac",
@@ -374,21 +368,24 @@ int main(int argc, char *argv[]) {
             "SlotTime", TimeValue(MicroSeconds(slotTime)),
             "SifsTime", TimeValue(MicroSeconds(sifsTime)),
             "LifsTime", TimeValue(MicroSeconds(lifsTime)),
-            "QueueLimits", UintegerValue(queueLimit),
-            "BasicAckTimeout", TimeValue(MicroSeconds(ackTimeout)));
+            "QueueLimits", UintegerValue(queueLimit));
 
     RescueHelper rescue;
     rescue.SetRemoteStationManager("ns3::ConstantRateRescueManager",
             "DataMode", StringValue(SimulationHelper::MapPhyRateToString(dataPhyRate)),
-            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)),
-            "MaxSrc", UintegerValue(++retryLimit));
+            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)));
+    rescue.SetArqManager("ns3::RescueArqManager",
+            "BasicAckTimeout", TimeValue(MicroSeconds(ackTimeout)),
+            "MaxRetryCount", UintegerValue(++retryLimit));
     NetDeviceContainer devices = rescue.Install(nodes, rescueChan, rescuePhy, rescueMac);
 
     RescueHelper relayRescue;
     relayRescue.SetRemoteStationManager("ns3::ConstantRateRescueManager",
             "DataMode", StringValue(SimulationHelper::MapPhyRateToString(relayDataPhyRate)),
-            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)),
-            "MaxSrc", UintegerValue(++retryLimit));
+            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)));
+    relayRescue.SetArqManager("ns3::RescueArqManager",
+            "BasicAckTimeout", TimeValue(MicroSeconds(ackTimeout)),
+            "MaxRetryCount", UintegerValue(++retryLimit));
     NetDeviceContainer relayDevice = relayRescue.Install(relayNode, rescueChan, rescuePhy, rescueMac);
 
     nodes.Add(relayNode);
@@ -399,18 +396,6 @@ int main(int argc, char *argv[]) {
     /* ============ Internet stack =========== */
 
     InternetStackHelper internet;
-
-    //MODIF
-    Ipv4ListRoutingHelper list;
-
-    Ipv4StaticRoutingHelper staticRouting;
-    list.Add(staticRouting, 10);
-
-    //    OlsrHelper olsr;
-    //        list.Add(olsr, 10);
-
-    internet.SetRoutingHelper(list); /* has effect on the next Install () */
-
     internet.Install(nodes);
 
     Ipv4AddressHelper ipv4;
@@ -427,7 +412,7 @@ int main(int argc, char *argv[]) {
     OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(iface.GetAddress(1), 1000));
     onOffHelper.SetConstantRate(dataRate, dataSize);
     onOffHelper.SetAttribute("MaxBytes", UintegerValue(packetLimit * dataSize));
-    onOffHelper.SetAttribute("StartTime", TimeValue(Seconds(10)));
+    onOffHelper.SetAttribute("StartTime", TimeValue(Seconds(1.0)));
     onOffHelper.SetAttribute("StopTime", TimeValue(end));
     //onOffHelper.SetAttribute ("RandSendTimeLimit", UintegerValue (random)); //packets generation times modified by random value between -50% and + 50% of constant time step between packets
     onOffHelper.Install(nodes.Get(0));
@@ -462,12 +447,12 @@ int main(int argc, char *argv[]) {
 
     /* ============= Flow Monitor ============ */
 
-    FlowMonitorHelper flowmon_helper;
-    Ptr<FlowMonitor> monitor = flowmon_helper.InstallAll();
-    monitor->SetAttribute("StartTime", TimeValue(Seconds(calcStart))); //czas od którego będa zbierane statystyki
-    monitor->SetAttribute("DelayBinWidth", DoubleValue(0.001));
-    monitor->SetAttribute("JitterBinWidth", DoubleValue(0.001));
-    monitor->SetAttribute("PacketSizeBinWidth", DoubleValue(20));
+    /*FlowMonitorHelper flowmon_helper;
+    Ptr<FlowMonitor> monitor = flowmon_helper.InstallAll ();
+    monitor->SetAttribute ("StartTime", TimeValue (Seconds (calcStart))); //czas od którego będa zbierane statystyki
+    monitor->SetAttribute ("DelayBinWidth", DoubleValue (0.001));
+    monitor->SetAttribute ("JitterBinWidth", DoubleValue (0.001));
+    monitor->SetAttribute ("PacketSizeBinWidth", DoubleValue (20));*/
 
 
 
@@ -482,30 +467,32 @@ int main(int argc, char *argv[]) {
 
     /* =========== Printing Results ========== */
 
-    monitor->CheckForLostPackets();
-    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon_helper.GetClassifier());
+    /*monitor->CheckForLostPackets();
+    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon_helper.GetClassifier ());
     std::string proto;
 
     //std::cout << std::endl;
 
     std::map< FlowId, FlowMonitor::FlowStats > stats = monitor->GetFlowStats();
-    for (std::map< FlowId, FlowMonitor::FlowStats >::iterator flow = stats.begin(); flow != stats.end(); flow++) {
-        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(flow->first);
-        switch (t.protocol) {
+    for (std::map< FlowId, FlowMonitor::FlowStats >::iterator flow = stats.begin (); flow != stats.end (); flow++)
+      {
+        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow (flow->first);
+        switch(t.protocol)
+          {
             case(6):
-                proto = "TCP";
-                break;
+              proto = "TCP";
+              break;
             case(17):
-                proto = "UDP";
-                break;
+              proto = "UDP";
+              break;
             default:
-                exit(1);
-        }
+              exit(1);
+          }
         std::cout << "\n====================================================\n"
-                << "FlowID: " << flow->first << "(" << proto << " "
-                << t.sourceAddress << "/" << t.sourcePort << " --> "
-                << t.destinationAddress << "/" << t.destinationPort << ")" <<
-                std::endl;
+                  << "FlowID: " << flow->first << "(" << proto << " "
+                  << t.sourceAddress << "/" << t.sourcePort << " --> "
+                  << t.destinationAddress << "/" << t.destinationPort << ")" <<
+        std::endl;
 
         std::cout << "  Tx Bytes: " << flow->second.txBytes << std::endl;
         std::cout << "  Rx Bytes: " << flow->second.rxBytes << std::endl;
@@ -515,27 +502,27 @@ int main(int argc, char *argv[]) {
         std::cout << "  Mean Delay: " << flow->second.delaySum / m_received << std::endl;
         std::cout << "  Mean Delay: " << flow->second.jitterSum / m_received << std::endl;
 
-        std::cout << "  Throughput [Mbps]: " << 8000 * (double) flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds() << std::endl;
+        std::cout << "  Throughput [Mbps]: " << 8000 * (double)flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds () << std::endl;*/
 
-        //        std::cout << "snr01 [dBm]:\tsnr02 [dBm]:\tsnr12 [dBm]:\tthr [Mbps]:" << std::endl;
-        //        std::cout << snr01 << "\t" << snr02 << "\t" << snr12 << "\t" << 8000 * (double) flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds() << std::endl;
-    }
+    //std::cout << "snr01 [dBm]:\tsnr02 [dBm]:\tsnr12 [dBm]:\tthr [Mbps]:" << std::endl;
+    //std::cout << snr01 << "\t" << snr02 << "\t" << snr12 << "\t" << 8000 * (double)flow->second.rxBytes / (flow->second.timeLastRxPacket - flow->second.timeFirstTxPacket).GetNanoSeconds () << std::endl;
+    //}
 
-    std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
-    std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;
-    std::cout << "  Tx Packets: " << m_send << std::endl;
-    std::cout << "  Rx Packets: " << m_received << std::endl;
-    std::cout << "  Throughput [Mbps]: " << 8 * (double) m_received_bytes / (double) (simTime - calcStart) / 1000000 << std::endl;
-    std::cout << "  Lost Packets [%]: " << ((m_send > m_received) ? (100 * ((double) m_send - (double) m_received) / (double) m_send) : 0) << std::endl;
-    std::cout << "  Mean Delay [ms]: " << (double) (m_delaySum / m_received).GetMicroSeconds() / 1000 << std::endl;
-    std::cout << "  Mean Jitter [ms]: " << (double) (m_jitterSum / m_received).GetMicroSeconds() / 1000 << std::endl;
+    //std::cout << "  Tx Bytes [B]: " << m_send_bytes << std::endl;
+    //std::cout << "  Rx Bytes [B]: " << m_received_bytes << std::endl;
+    //std::cout << "  Tx Packets: " << m_send << std::endl;
+    //std::cout << "  Rx Packets: " << m_received << std::endl;
+    //std::cout << "  Throughput [Mbps]: " << 8 * (double)m_received_bytes / (double)(simTime - calcStart) / 1000000 << std::endl;
+    //std::cout << "  Lost Packets [%]: " <<  ((m_send > m_received) ? (100 * ((double)m_send - (double)m_received) / (double)m_send) : 0) << std::endl;
+    //std::cout << "  Mean Delay [ms]: " << (double)(m_delaySum / m_received).GetMicroSeconds () / 1000 << std::endl;
+    //std::cout << "  Mean Jitter [ms]: " << (double)(m_jitterSum / m_received).GetMicroSeconds () / 1000 << std::endl;
 
-    std::cout << "snrSD [dBm]:\tsnrSR [dBm]:\tsnrRD [dBm]:\tthr [Mbps]:" << std::endl;
+    //std::cout << "snrSD [dBm]:\tsnrSR [dBm]:\tsnrRD [dBm]:\tthr [Mbps]:" << std::endl;
     std::cout << dSD << "\t" << dSR << "\t" << dRD << "\t"
             << 8 * (double) m_received_bytes / (double) (simTime - calcStart) / 1000000 << "\t"
             << ((m_send > m_received) ? (100 * ((double) m_send - (double) m_received) / (double) m_send) : 0) << "\t"
-            << (double) (m_delaySum / m_received).GetMicroSeconds() / 1000 << "\t"
-            << (double) (m_jitterSum / m_received).GetMicroSeconds() / 1000 << std::endl;
+            << ((m_received > 0) ? ((double) (m_delaySum / m_received).GetMicroSeconds() / 1000) : 0.0) << "\t"
+            << ((m_received > 0) ? ((double) (m_jitterSum / m_received).GetMicroSeconds() / 1000) : 0.0) << std::endl;
 
     return 0;
 }

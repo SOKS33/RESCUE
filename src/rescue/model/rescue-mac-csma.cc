@@ -30,10 +30,6 @@
 #include "ns3/trace-source-accessor.h"
 #include "ns3/node.h"
 
-#include "ns3/arp-cache.h"
-#include "ns3/object-vector.h"
-#include "ns3/ipv4-interface.h"
-
 #include "rescue-mac.h"
 #include "rescue-phy.h"
 #include "rescue-remote-station-manager.h"
@@ -42,9 +38,8 @@
 #include "rescue-mac-trailer.h"
 #include "rescue-mac-csma.h"
 #include "snr-per-tag.h"
-#include "ns3/ipv4-static-routing.h"
-#include "src/core/model/object.h"
-#include "ns3/rescue-mac-header.h"
+
+#include "rescue-utils.h"
 
 NS_LOG_COMPONENT_DEFINE("RescueMacCsma");
 
@@ -55,39 +50,37 @@ std::string COLOR_BLUE = "\x1b[34m";
 std::string COLOR_DEFAULT = "\x1b[0m";
 
 #undef NS_LOG_APPEND_CONTEXT
-#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetSeconds() << "] [addr=" << ((m_hiMac != 0) ? compressMac(m_hiMac->GetAddress ()) : 0) << "] [MAC CSMA] "
+#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetMicroSeconds() << "] [addr=" << ((m_hiMac != 0) ? compressMac(m_hiMac->GetAddress ()) : 0) << "] [MAC CSMA] "
 
+#define LOG_STR "[time=" << ns3::Simulator::Now().GetMicroSeconds() << "] [addr=" << ((m_hiMac != 0) ? compressMac(m_hiMac->GetAddress ()) : 0) << "] [MAC CSMA] "
 namespace ns3 {
-
 
     NS_OBJECT_ENSURE_REGISTERED(RescueMacCsma);
 
     RescueMacCsma::RescueMacCsma()
     : m_phy(0),
     m_hiMac(0),
-    m_arqManager(0),
     m_ccaTimeoutEvent(),
     m_backoffTimeoutEvent(),
-    m_ackTimeoutEvent(),
     m_sendAckEvent(),
-    m_sendDataEvent(),
     m_state(IDLE),
     m_pktTx(0),
     m_pktData(0) {
-        //NS_LOG_FUNCTION (this);
+        NS_LOG_FUNCTION("");
         m_cw = m_cwMin;
         m_backoffRemain = Seconds(0);
         m_backoffStart = Seconds(0);
-        m_sequence = 0;
         m_interleaver = 0;
         m_random = CreateObject<UniformRandomVariable> ();
     }
 
     RescueMacCsma::~RescueMacCsma() {
+        NS_LOG_FUNCTION("");
     }
 
     void
     RescueMacCsma::DoDispose() {
+        NS_LOG_FUNCTION("");
         Clear();
         m_remoteStationManager = 0;
         m_arqManager = 0;
@@ -95,19 +88,23 @@ namespace ns3 {
 
     void
     RescueMacCsma::Clear() {
+        NS_LOG_FUNCTION("");
+        if (m_ccaTimeoutEvent.IsRunning())
+            m_ccaTimeoutEvent.Cancel();
+        if (m_backoffTimeoutEvent.IsRunning())
+            m_backoffTimeoutEvent.Cancel();
+        if (m_sendAckEvent.IsRunning())
+            m_sendAckEvent.Cancel();
+
         m_pktTx = 0;
         NS_LOG_DEBUG("RESET PACKET");
         m_pktData = 0;
         m_pktQueue.clear();
-        m_seqList.clear();
-    }
-
-    RescueMacCsma::FrameInfo::FrameInfo(uint8_t il,
-            bool ACKed,
-            bool retried)
-    : il(il),
-    ACKed(ACKed),
-    retried(retried) {
+        m_pktRetryQueue.clear();
+        m_pktRelayQueue.clear();
+        m_ctrlPktQueue.clear();
+        m_ackQueue.clear();
+        m_ackCache.clear();
     }
 
     TypeId
@@ -145,11 +142,6 @@ namespace ns3 {
                 UintegerValue(20),
                 MakeUintegerAccessor(&RescueMacCsma::m_queueLimit),
                 MakeUintegerChecker<uint32_t> ())
-                .AddAttribute("BasicAckTimeout",
-                "ACK awaiting time",
-                TimeValue(MicroSeconds(3000)),
-                MakeTimeAccessor(&RescueMacCsma::m_basicAckTimeout),
-                MakeTimeChecker())
 
                 /*.AddTraceSource ("AckTimeout",
                                  "Trace Hookup for ACK Timeout",
@@ -213,6 +205,13 @@ namespace ns3 {
     }
 
     void
+    RescueMacCsma::SetArqManager(Ptr<RescueArqManager> arqManager) {
+        //NS_LOG_FUNCTION (this << arqManager);
+        m_arqManager = arqManager;
+        //m_arqManager->SetBasicAckTimeout (m_basicAckTimeout);
+    }
+
+    void
     RescueMacCsma::SetCwMin(uint32_t cw) {
         m_cwMin = cw;
         if (m_remoteStationManager != 0)
@@ -249,11 +248,6 @@ namespace ns3 {
     void
     RescueMacCsma::SetQueueLimits(uint32_t length) {
         m_queueLimit = length;
-    }
-
-    void
-    RescueMacCsma::SetBasicAckTimeout(Time duration) {
-        m_basicAckTimeout = duration;
     }
 
     int64_t
@@ -302,19 +296,14 @@ namespace ns3 {
     }
 
     Time
-    RescueMacCsma::GetBasicAckTimeout(void) const {
-        return m_basicAckTimeout;
-    }
-
-    Time
     RescueMacCsma::GetCtrlDuration(uint16_t type, RescueMode mode) {
         RescueMacHeader hdr = RescueMacHeader(m_hiMac->GetAddress(), m_hiMac->GetAddress(), type);
-        return m_phy->CalTxDuration(hdr.GetSize(), 0, m_phy->GetPhyHeaderMode(mode), mode, type);
+        return m_phy->CalTxDuration(hdr.GetSize(), 0, m_phy->GetPhyHeaderMode(mode), mode, type, false);
     }
 
     Time
     RescueMacCsma::GetDataDuration(Ptr<Packet> pkt, RescueMode mode) {
-        return m_phy->CalTxDuration(0, pkt->GetSize(), m_phy->GetPhyHeaderMode(mode), mode, 0);
+        return m_phy->CalTxDuration(0, pkt->GetSize(), m_phy->GetPhyHeaderMode(mode), mode, RESCUE_PHY_PKT_TYPE_DATA, false);
     }
 
     std::string
@@ -346,17 +335,17 @@ namespace ns3 {
 
     bool
     RescueMacCsma::Enqueue(Ptr<Packet> pkt, Mac48Address dst) {
-        NS_LOG_FUNCTION(this << pkt << dst);
-        NS_LOG_INFO("dst:" << dst <<
-                " size [B]:" << pkt->GetSize() <<
-                " #Queue:" << m_pktQueue.size() <<
-                " #relayQueue:" << m_pktRelayQueue.size() <<
-                " #ctrlQueue:" << m_ctrlPktQueue.size() <<
-                " #ackQueue:" << m_ackForwardQueue.size() <<
-                " state:" << StateToString(m_state));
+        NS_LOG_FUNCTION("dst:" << dst <<
+                "size [B]:" << pkt->GetSize() <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state));
         if (m_pktQueue.size() >= m_queueLimit) {
             dropped++;
-            //            NS_LOG_UNCOND("PACKET QUEUE LIMIT REACHED - DROP FRAME! " << dropped);
+            NS_LOG_DEBUG("PACKET QUEUE LIMIT REACHED - DROP FRAME!");
             return false;
         }
 
@@ -371,14 +360,70 @@ namespace ns3 {
     }
 
     bool
-    RescueMacCsma::EnqueueCtrl(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
-        NS_LOG_FUNCTION(this << pkt << phyHdr);
-        NS_LOG_INFO("dst:" << phyHdr.GetDestination() <<
+    RescueMacCsma::EnqueueRetry(Ptr<Packet> pkt, Mac48Address dst) {
+        NS_LOG_FUNCTION("dst:" << dst <<
                 "size [B]:" << pkt->GetSize() <<
-                "#Queue:" << m_pktQueue.size() <<
-                "#relayQueue:" << m_pktRelayQueue.size() <<
-                "#ctrlQueue:" << m_ctrlPktQueue.size() <<
-                "#ackQueue:" << m_ackForwardQueue.size() <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state));
+        if (m_pktRetryQueue.size() >= m_queueLimit) {
+            NS_LOG_DEBUG("PACKET RETRY QUEUE LIMIT REACHED - DROP FRAME!");
+            return false;
+        }
+
+        //m_traceEnqueue (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), pkt);
+        m_pktRetryQueue.push_back(pkt);
+
+        if (m_state == IDLE) {
+            CcaForLifs();
+        }
+
+        return true;
+    }
+
+    bool
+    RescueMacCsma::EnqueueRelay(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("dst:" << phyHdr.GetDestination() <<
+                "size [B]:" << pkt->GetSize() <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state));
+        if (m_pktRelayQueue.size() >= m_queueLimit) {
+            NS_LOG_DEBUG("PACKET RELAY QUEUE LIMIT REACHED - DROP FRAME!");
+            return false;
+        }
+
+        //m_traceEnqueue (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), pkt);
+        std::pair<Ptr<Packet>, RescuePhyHeader> relayPkt(pkt, phyHdr);
+        NS_LOG_INFO("ENQUEUE RELAY DATA FRAME! from src: " << relayPkt.second.GetSource() << " to dst: " << relayPkt.second.GetDestination() << ", seq: " << relayPkt.second.GetSequence());
+        m_pktRelayQueue.push_back(relayPkt);
+
+        if (m_state == IDLE) {
+            //MODIF3
+            if (CC_ENABLED || DISTRIBUTED_ACK_ENABLED)
+                CcaForSifs();
+            else
+                CcaForLifs();
+        }
+
+        return true;
+    }
+
+    bool
+    RescueMacCsma::EnqueueCtrl(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("dst:" << phyHdr.GetDestination() <<
+                "size [B]:" << pkt->GetSize() <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
                 "state:" << StateToString(m_state));
         if (m_ctrlPktQueue.size() >= m_queueLimit) {
             NS_LOG_DEBUG("CTRL QUEUE LIMIT REACHED - DROP CTRL FRAME!");
@@ -393,37 +438,58 @@ namespace ns3 {
             CcaForLifs();
         }
 
-        return false;
+        return true;
     }
 
-    void
-    RescueMacCsma::Dequeue() {
-        NS_LOG_FUNCTION(this);
-        NS_LOG_INFO("#Queue:" << m_pktQueue.size() <<
-                "#relayQueue:" << m_pktRelayQueue.size() <<
-                "#ctrlQueue:" << m_ctrlPktQueue.size() <<
-                "#ackQueue:" << m_ackForwardQueue.size());
-        m_pktQueue.remove(m_pktData);
-    }
+    bool
+    RescueMacCsma::EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("dst:" << phyHdr.GetDestination() <<
+                "size [B]:" << pkt->GetSize() <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state));
+        if (m_ackQueue.size() >= m_queueLimit) {
+            NS_LOG_DEBUG("ACK QUEUE LIMIT REACHED - DROP CTRL FRAME!");
+            return false;
+        }
 
-    /*void
-    RescueMacCsma::DequeueCtrl ()
-    {
-      NS_LOG_FUNCTION ("#queue:" << m_pktQueue.size () <<
-                       "#relay queue:" << m_pktRelayQueue.size () <<
-                       "#ctrl queue:" << m_ctrlPktQueue.size () <<
-                       "#ack queue:" << m_ackForwardQueue.size ());
-      m_ctrlPktQueue.remove (m_pktRelay);
-    }*/
+        //m_traceEnqueue (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), pkt);
+        std::pair<Ptr<Packet>, RescuePhyHeader> ackPkt(pkt, phyHdr);
+        m_ackQueue.push_back(ackPkt);
+
+        if (m_state == IDLE) {
+            //MODIF3
+            if (CC_ENABLED || DISTRIBUTED_ACK_ENABLED)
+                CcaForSifs();
+            else
+                CcaForLifs();
+        }
+
+        return true;
+    }
 
 
 
     // ------------------ Channel Access Functions -------------------------
 
-    //MODIF
-    //    std::map<Mac48Address, bool> RescueMacCsma::ControlChannel;
+    void RescueMacCsma::SetTxDuration(Time txDuration) {
+        this->m_txDuration = txDuration;
+    }
 
-#define CC_ENABLED 1
+    Time RescueMacCsma::GetTxDuration() {
+        return m_txDuration;
+    }
+
+    void RescueMacCsma::SetChannelDelay(Time delay) {
+        this->m_channelDelay = delay;
+    }
+
+    Time RescueMacCsma::GetChannelDelay() {
+        return m_channelDelay;
+    }
 
     bool RescueMacCsma::GetControlChannel() {
         return m_controlChannel;
@@ -432,12 +498,6 @@ namespace ns3 {
     bool RescueMacCsma::GetDataChannel() {
         return (m_state == RX || m_state == TX);
     }
-
-    //    void RescueMacCsma::resetChannel() {
-    //        NS_LOG_FUNCTION(this);
-    //        m_controlChannel = false;
-    //        m_state = IDLE;
-    //    }
 
     bool RescueMacCsma::CheckCCForTransmission() {
         if (!CC_ENABLED)
@@ -463,7 +523,6 @@ namespace ns3 {
         if (!CC_ENABLED)
             return;
 
-        NS_LOG_FUNCTION(this);
         for (uint32_t i = 0; i < m_phy->GetChannel()->GetNDevices(); i++) {
             Ptr<RescueNetDevice> nd = DynamicCast<RescueNetDevice> (m_phy->GetChannel()->GetDevice(i));
             if (!nd)
@@ -476,14 +535,14 @@ namespace ns3 {
             if (it != m_neighbors.end()) {
                 it->second.first = mac->GetCsmaMac()->GetDataChannel();
                 it->second.second = mac->GetCsmaMac()->GetControlChannel();
-                NS_LOG_DEBUG("Node " << it->first << " -> DC=" << it->second.first << " CC=" << it->second.second);
+                if (CC_LOG_ENABLED)
+                    NS_LOG_DEBUG("Node " << it->first << " -> DC=" << it->second.first << " CC=" << it->second.second);
             }
 
         }
     }
 
     bool RescueMacCsma::updateLocalControlChannel() {
-        //        NS_LOG_FUNCTION(this);
         bool old = m_controlChannel;
 
         //My CC is busy if i'm in TX or RX mode
@@ -499,28 +558,29 @@ namespace ns3 {
 
             m_controlChannel = (count > 0 ? true : false);
         }
-        NS_LOG_DEBUG("Local state DC=" << GetDataChannel() << " CC=" << GetControlChannel() <<
+        if (CC_LOG_ENABLED)
+            NS_LOG_DEBUG("Local state DC=" << GetDataChannel() << " CC=" << GetControlChannel() <<
                 COLOR_RED << (old != m_controlChannel ? " CHANGED" : "") << COLOR_DEFAULT);
 
         return (old != m_controlChannel);
     }
 
     void RescueMacCsma::triggerNeighborhoodUpdate() {
-        NS_LOG_FUNCTION(this);
         for (std::map<Mac48Address, Ptr < RescueMacCsma>>::iterator it = m_neighborsPtr.begin();
                 it != m_neighborsPtr.end(); it++) {
-            NS_LOG_DEBUG(COLOR_YELLOW << "Triggering updateControlChannel for neighbor " << it->first << COLOR_DEFAULT);
+            if (CC_LOG_ENABLED)
+                NS_LOG_DEBUG(COLOR_YELLOW << "Triggering updateControlChannel for neighbor " << it->first << COLOR_DEFAULT);
             Simulator::ScheduleNow(&RescueMacCsma::TriggeredUpdateControlChannel, it->second);
         }
     }
 
     void RescueMacCsma::TriggeredUpdateControlChannel() {
-        NS_LOG_DEBUG(COLOR_BLUE << "Control Channel update TRIGGERED " << COLOR_DEFAULT);
+        if (CC_LOG_ENABLED)
+            NS_LOG_DEBUG(COLOR_BLUE << "Control Channel update TRIGGERED " << COLOR_DEFAULT);
         updateControlChannel();
     }
 
     void RescueMacCsma::updateControlChannel() {
-        //        NS_LOG_FUNCTION(this);
         if (!CC_ENABLED)
             return;
 
@@ -530,6 +590,8 @@ namespace ns3 {
     }
 
     void RescueMacCsma::printTopology() {
+        if (!CC_ENABLED)
+            return;
 
         std::ostringstream os;
 
@@ -543,12 +605,15 @@ namespace ns3 {
                 NS_FATAL_ERROR("Node doesn't have MAC CSMA");
             os << mac->GetAddress() << " DC=" << mac->GetCsmaMac()->GetDataChannel() <<
                     " CC=" << mac->GetCsmaMac()->GetControlChannel() << std::endl;
-
         }
-        NS_LOG_DEBUG(os.str());
+        if (CC_LOG_ENABLED)
+            NS_LOG_DEBUG(os.str());
     }
 
     void RescueMacCsma::printCC() {
+        if (!CC_ENABLED)
+            return;
+
         NS_LOG_FUNCTION(this);
         std::ostringstream os;
         os << "Neighbors from node " << this->m_device->GetNode()->GetId() + 1 <<
@@ -560,10 +625,14 @@ namespace ns3 {
             os << "\t Neighbor " << it->first << " ->\t" <<
                 " DC=" << (it->second.first ? "BUSY" : "FREE") <<
             " CC=" << (it->second.second ? "BUSY" : "FREE") << std::endl;
+        //        if (CC_LOG_ENABLED)
         NS_LOG_DEBUG(os.str());
     }
 
     void RescueMacCsma::AddNeighbor(Mac48Address addr) {
+        if (!CC_ENABLED)
+            return;
+
         m_neighbors.insert(std::make_pair(addr, std::make_pair(false, false)));
 
         Ptr<RescueMacCsma> ptr;
@@ -582,19 +651,22 @@ namespace ns3 {
             NS_FATAL_ERROR("Neighbor RescueMacCsma doesn't exist...");
 
         m_neighborsPtr.insert(std::make_pair(addr, ptr));
-        NS_LOG_DEBUG(COLOR_RED << "New neighbor with address " << addr << COLOR_DEFAULT);
+        if (CC_LOG_ENABLED)
+            NS_LOG_DEBUG(COLOR_RED << "New neighbor with address " << addr << COLOR_DEFAULT);
     }
 
     void
     RescueMacCsma::ReceiveBeacon(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
-        NS_LOG_FUNCTION(this);
-        if (!CC_ENABLED)
-            return;
-
-        AddNeighbor(phyHdr.GetSource());
+        if (CC_ENABLED)
+            AddNeighbor(phyHdr.GetSource());
+        else
+            m_hiMac->ReceiveBeacon(pkt, phyHdr);
     }
 
     void RescueMacCsma::SendBeacon() {
+        if (!CC_ENABLED)
+            NS_FATAL_ERROR("Should not send beacon when CC is disabled");
+
         NS_LOG_FUNCTION(this);
 
         RescueMacHeader hdr = RescueMacHeader(this->m_hiMac->GetAddress(), this->m_hiMac->GetAddress(), RESCUE_MAC_PKT_TYPE_B);
@@ -611,7 +683,7 @@ namespace ns3 {
 
     bool
     RescueMacCsma::StartOperation() {
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
 
         if (CC_ENABLED) {
             //MODIF
@@ -624,6 +696,7 @@ namespace ns3 {
         }
 
         m_enabled = true;
+        m_state = IDLE;
         m_opEnd = Seconds(0);
         CcaForLifs();
         return true;
@@ -632,8 +705,9 @@ namespace ns3 {
 
     bool
     RescueMacCsma::StartOperation(Time duration) {
-        NS_LOG_FUNCTION(duration);
+        NS_LOG_FUNCTION("");
         m_enabled = true;
+        m_state = IDLE;
         m_opEnd = Simulator::Now() + duration;
         CcaForLifs();
         return true;
@@ -641,16 +715,20 @@ namespace ns3 {
 
     bool
     RescueMacCsma::StopOperation() {
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
         m_enabled = false;
         m_nopBegin = Seconds(0);
         ChannelBecomesBusy();
+        for (RelayQueueI it = m_ctrlPktQueue.begin(); it != m_ctrlPktQueue.end(); it++) {
+            it = m_ctrlPktQueue.erase(it);
+        }
+
         return true;
     }
 
     bool
     RescueMacCsma::StopOperation(Time duration) {
-        NS_LOG_FUNCTION(duration);
+        NS_LOG_FUNCTION("");
         m_enabled = false;
         m_nopBegin = Simulator::Now() + duration;
         ChannelBecomesBusy();
@@ -658,141 +736,98 @@ namespace ns3 {
     }
 
     void
-    RescueMacCsma::CcaForLifs() {
+    RescueMacCsma::CcaForSifs() {
+        if (!CC_ENABLED)
+            NS_FATAL_ERROR("Should not wait for SIFS when CC is disabled");
+
+        NS_LOG_FUNCTION(this);
         if (!m_enabled) {
             return;
         }
-        //        NS_LOG_FUNCTION(this);
 
-        //        NS_LOG_INFO("#Queue:" << m_pktQueue.size() <<
-        //                " #relayQueue:" << m_pktRelayQueue.size() <<
-        //                " #ctrlQueue:" << m_ctrlPktQueue.size() <<
-        //                " #ackQueue:" << m_ackForwardQueue.size() <<
-        //                " state:" << StateToString(m_state) <<
-        //                " phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE"));
+        NS_LOG_FUNCTION("#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state) <<
+                "phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE") <<
+                "CCA running:" << (m_ccaTimeoutEvent.IsRunning() ? "YES" : "NO"));
+
 
         if (((m_pktQueue.size() == 0)
+                && (m_pktRetryQueue.size() == 0)
                 && (m_pktRelayQueue.size() == 0)
                 && (m_ctrlPktQueue.size() == 0)
-                && (m_ackForwardQueue.size() == 0))
+                && (m_ackQueue.size() == 0))
                 || m_ccaTimeoutEvent.IsRunning()) {
             return;
         }
         if (m_state != IDLE || !m_phy->IsIdle()) {
-            m_ccaTimeoutEvent = Simulator::Schedule(GetLifsTime(), &RescueMacCsma::CcaForLifs, this);
+            NS_LOG_FUNCTION("not idle, schedule another CcaForSifs ()");
+            m_ccaTimeoutEvent = Simulator::Schedule(GetSifsTime(), &RescueMacCsma::CcaForSifs, this);
             return;
         }
-        m_ccaTimeoutEvent = Simulator::Schedule(GetLifsTime(), &RescueMacCsma::BackoffStart, this);
+        NS_LOG_FUNCTION("idle, schedule backoff start");
+        m_ccaTimeoutEvent = Simulator::Schedule(GetSifsTime(), &RescueMacCsma::BackoffStartSifs, this);
     }
 
     void
-    RescueMacCsma::BackoffStart() {
-        //        NS_LOG_FUNCTION("BACKOFF remain:" << m_backoffRemain <<
-        //                " state:" << StateToString(m_state) <<
-        //                " phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE"));
+    RescueMacCsma::BackoffStartSifs() {
+        if (!CC_ENABLED)
+            NS_FATAL_ERROR("Should not BACKOFF SIFS when CC is disabled");
+
+        NS_LOG_FUNCTION("B-OFF SIFS remain:" << m_backoffRemain <<
+                "state:" << StateToString(m_state) <<
+                "phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE"));
+
         if (m_state != IDLE || !m_phy->IsIdle()) {
-            CcaForLifs();
+            CcaForSifs();
             return;
         }
+
         if (m_backoffRemain == Seconds(0)) {
-            //CW setting
-            if (m_ackForwardQueue.size() != 0) {
-                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_ackForwardQueue.front();
+
+            //Relay ACK with SIFS only when DISTRIBUTED_ACK_ENABLED set
+            if (DISTRIBUTED_ACK_ENABLED && m_ackQueue.size() != 0) {
+                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_ackQueue.front();
                 SetCw(m_remoteStationManager->GetAckCw(pktRelay.second.GetDestination()));
-            } else if (m_ctrlPktQueue.size() != 0) {
-                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_ctrlPktQueue.front();
-                SetCw(m_remoteStationManager->GetCtrlCw(pktRelay.second.GetDestination()));
-            } else if (m_pktRelayQueue.size() != 0) {
+            } else
+                if (m_pktRelayQueue.size() != 0) {
                 std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_pktRelayQueue.front();
                 SetCw(m_remoteStationManager->GetDataCw(pktRelay.second.GetDestination(), pktRelay.first, pktRelay.first->GetSize()));
-            } else if ((m_pktQueue.size() != 0) && !m_ackTimeoutEvent.IsRunning()) {
-                Ptr<Packet> pktData = m_pktQueue.front();
-                RescueMacHeader hdr;
-                pktData->PeekHeader(hdr);
-                RescueMacTrailer fcs;
-                SetCw(m_remoteStationManager->GetDataCw(hdr.GetDestination(), pktData, pktData->GetSize() + fcs.GetSerializedSize()));
             }
 
-            uint32_t slots = m_random->GetInteger(0, m_cw - 1);
-            m_backoffRemain = Seconds((double) (slots) * GetSlotTime().GetSeconds());
 
-            //            NS_LOG_DEBUG("BACKOFF(0," << m_cw - 1 << ")=" << slots <<
-            //                    ", backoffRemain " << m_backoffRemain.GetSeconds() <<
-            //                    ", will finish " << (m_backoffRemain + Simulator::Now()).GetSeconds());
+            m_backoffRemain = Seconds(0);
         }
         m_backoffStart = Simulator::Now();
-        m_backoffTimeoutEvent = Simulator::Schedule(m_backoffRemain, &RescueMacCsma::ChannelAccessGranted, this);
+        m_backoffTimeoutEvent = Simulator::ScheduleNow(&RescueMacCsma::ChannelAccessGrantedRelay, this);
     }
 
     void
-    RescueMacCsma::ChannelBecomesBusy() {
-        NS_LOG_FUNCTION(this);
-        if (m_backoffTimeoutEvent.IsRunning()) {
-            m_backoffTimeoutEvent.Cancel();
-            Time elapse;
-            if (Simulator::Now() > m_backoffStart) {
-                elapse = Simulator::Now() - m_backoffStart;
-            }
-            if (elapse < m_backoffRemain) {
-
-                m_backoffRemain = m_backoffRemain - elapse;
-                m_backoffRemain = RoundOffTime(m_backoffRemain);
-            }
-            NS_LOG_DEBUG("Freeze backoff! Remain " << m_backoffRemain);
-        }
-        CcaForLifs();
-    }
-
-    void
-    RescueMacCsma::ChannelAccessGranted() {
+    RescueMacCsma::ChannelAccessGrantedRelay() {
+        if (!CC_ENABLED)
+            NS_LOG_UNCOND("Should not execute ChannelAccessGrantedRelay when CC is disabled ");
         NS_LOG_FUNCTION(this);
 
-        for (RelayQueueI it = m_pktRelayQueue.begin(); it != m_pktRelayQueue.end();) {
-            if (m_resendAck) break;
-            if (CheckRelayedFrame(*it)) {
-                it = m_pktRelayQueue.erase(it);
-                //NS_LOG_DEBUG("erase!");
-            } else {
-                it++;
-            }
-        }
+        //Try to relay ACK when DISTRIBUTED_ACK_ENABLED only
 
-        if (m_ackForwardQueue.size() != 0) {
+        if (DISTRIBUTED_ACK_ENABLED && m_ackQueue.size() != 0) {
+
+            NS_LOG_UNCOND("CHANNEL ACCESS GRANTED RELAY ACK");
+
             m_backoffStart = Seconds(0);
             m_backoffRemain = Seconds(0);
-
-            //MODIF
             m_state = WAIT_TX;
-            //            updateControlChannel();
 
-            m_pktRelay = m_ackForwardQueue.front();
-            m_ackForwardQueue.pop_front();
-            if (!m_resendAck) m_ackCache.push_front(m_pktRelay); //record ACK in cache
+            m_pktRelay = m_ackQueue.front();
+            m_ackQueue.pop_front();
 
             if (m_pktRelay.first == 0)
                 NS_ASSERT("Null packet for ack forward tx");
 
-            NS_LOG_INFO("FORWARD ACK!");
-            //m_traceAckForward (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
-
-            SendRelayedData();
-            m_resendAck = false;
-        } else if (m_ctrlPktQueue.size() != 0) {
-            m_backoffStart = Seconds(0);
-            m_backoffRemain = Seconds(0);
-
-            //MODIF
-            m_state = WAIT_TX;
-            //            updateControlChannel();
-
-            m_pktRelay = m_ctrlPktQueue.front();
-            m_ctrlPktQueue.pop_front();
-
-            if (m_pktRelay.first == 0)
-                NS_ASSERT("Null control packet for tx");
-
-            NS_LOG_INFO("TRANSMIT CONTROL FRAME!");
-            //m_traceCtrlTx (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
+            NS_LOG_INFO("FORWARD ACK to: " << m_pktRelay.second.GetDestination() << ", seq: " << m_pktRelay.second.GetSequence() << "!");
 
             SendRelayedData();
         } else if (m_pktRelayQueue.size() != 0) {
@@ -810,36 +845,295 @@ namespace ns3 {
                 NS_ASSERT("Null packet for relay tx");
 
             NS_LOG_INFO("RELAY DATA FRAME!");
-            //m_traceDataRelay (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
-
             SendRelayedData();
-        } else if ((m_pktQueue.size() != 0) && !m_ackTimeoutEvent.IsRunning()) {
-            NS_LOG_DEBUG("SEND QUEUED PACKET!");
+        } else
+            NS_LOG_INFO("WEIRD : No packet to relay ....");
+
+    }
+
+    void
+    RescueMacCsma::CheckRelaying(RescueMacHeader hdr, Ptr<Packet> pkt) {
+        if (!CC_ENABLED)
+            NS_FATAL_ERROR("Should not check relaying when CC is disabled");
+
+        NS_LOG_FUNCTION(this << hdr << pkt);
+        updateNeighborhood();
+
+        RescuePhyHeader phyHdr;
+        pkt->PeekHeader(phyHdr);
+        NS_LOG_FUNCTION(phyHdr);
+
+        bool relayingSuccessful = false;
+        bool nodeIsLastHop = false;
+        bool nodeIsSource = false;
+
+        for (std::map < Mac48Address, std::pair<bool, bool>>::const_iterator it = m_neighbors.begin();
+                it != m_neighbors.end(); it++) {
+            if (it->second.first)
+                relayingSuccessful = true;
+            if (it->first == hdr.GetDestination())
+                nodeIsLastHop = true;
+        }
+        if (m_hiMac->GetAddress() == hdr.GetSource())
+            nodeIsSource = true;
+
+        if (relayingSuccessful) {
+
+            if (DISTRIBUTED_ACK_ENABLED) {
+                //DistributedMAC with E2E ACK
+                //Don't know what to
+            } else { //DistributedMAC
+                if (nodeIsSource) {
+                    NS_LOG_DEBUG(LOG_STR << COLOR_YELLOW << "I'm the source ! Relaying OK : Stop ACK timeout scheduling !" << COLOR_DEFAULT);
+                    m_arqManager->RelayingStopAck(hdr.GetDestination(), hdr.GetSequence());
+                } else
+                    NS_LOG_DEBUG(LOG_STR << COLOR_YELLOW << "Some neighbor just transmitted (hopefully)" << COLOR_DEFAULT);
+            }
+            SendDataDone();
+        } else if (nodeIsLastHop) {
+            NS_LOG_DEBUG(LOG_STR << COLOR_YELLOW << "I'm LAST HOP shouldn't check anything" << COLOR_DEFAULT);
+            //            m_arqManager->RelayingStopAck(hdr.GetDestination(), hdr.GetSequence());
+            SendDataDone();
+        } else {
+            NS_LOG_DEBUG(LOG_STR << COLOR_RED << "Transmission failed ? TRY ACKTIMEOUT" << COLOR_DEFAULT);
+            m_arqManager->AckTimeout(pkt);
+        }
+
+    }
+
+    //--------------------------------------------------------------------------
+
+    void
+    RescueMacCsma::CcaForLifs() {
+        NS_LOG_FUNCTION("");
+        if (!m_enabled) {
+            return;
+        }
+
+        NS_LOG_FUNCTION("#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size() <<
+                "state:" << StateToString(m_state) <<
+                "phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE") <<
+                "CCA running:" << (m_ccaTimeoutEvent.IsRunning() ? "YES" : "NO"));
+        Time now = Simulator::Now();
+
+        if (((m_pktQueue.size() == 0)
+                && (m_pktRetryQueue.size() == 0)
+                && (m_pktRelayQueue.size() == 0)
+                && (m_ctrlPktQueue.size() == 0)
+                && (m_ackQueue.size() == 0))
+                || m_ccaTimeoutEvent.IsRunning()) {
+            return;
+        }
+
+        if (m_state != IDLE || !m_phy->IsIdle()) {
+            //MODIF 4
+            //        if ((m_state != IDLE && !CheckCCForTransmission()) || !m_phy->IsIdle()) {
+            NS_LOG_FUNCTION("not idle, schedule another CcaForLifs ()");
+            m_ccaTimeoutEvent = Simulator::Schedule(GetLifsTime(), &RescueMacCsma::CcaForLifs, this);
+            return;
+        }
+        NS_LOG_FUNCTION("idle, schedule backoff start");
+        m_ccaTimeoutEvent = Simulator::Schedule(GetLifsTime(), &RescueMacCsma::BackoffStart, this);
+    }
+
+    void
+    RescueMacCsma::BackoffStart() {
+        NS_LOG_FUNCTION("B-OFF remain:" << m_backoffRemain <<
+                "state:" << StateToString(m_state) <<
+                "phy idle:" << (m_phy->IsIdle() ? "TRUE" : "FALSE"));
+        if (m_state != IDLE || !m_phy->IsIdle()) {
+            CcaForLifs();
+            return;
+        }
+        if (m_backoffRemain == Seconds(0)) {
+            //CW setting
+            if (m_ackQueue.size() != 0) {
+                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_ackQueue.front();
+                SetCw(m_remoteStationManager->GetAckCw(pktRelay.second.GetDestination()));
+            } else if (m_ctrlPktQueue.size() != 0) {
+                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_ctrlPktQueue.front();
+                SetCw(m_remoteStationManager->GetCtrlCw(pktRelay.second.GetDestination()));
+            } else if (m_pktRelayQueue.size() != 0) {
+                std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay = m_pktRelayQueue.front();
+                SetCw(m_remoteStationManager->GetDataCw(pktRelay.second.GetDestination(), pktRelay.first, pktRelay.first->GetSize()));
+            } else if (m_pktRetryQueue.size() != 0) {
+                Ptr<Packet> pktData = m_pktRetryQueue.front();
+                RescueMacHeader hdr;
+                pktData->PeekHeader(hdr);
+                RescueMacTrailer fcs;
+                SetCw(m_remoteStationManager->GetDataCw(hdr.GetDestination(), pktData, pktData->GetSize() + fcs.GetSerializedSize()));
+            } else if (m_pktQueue.size() != 0) {
+                Ptr<Packet> pktData = m_pktQueue.front();
+                RescueMacHeader hdr;
+                pktData->PeekHeader(hdr);
+                RescueMacTrailer fcs;
+                SetCw(m_remoteStationManager->GetDataCw(hdr.GetDestination(), pktData, pktData->GetSize() + fcs.GetSerializedSize()));
+            }
+
+            uint32_t slots = m_random->GetInteger(0, m_cw - 1);
+            m_backoffRemain = Seconds((double) (slots) * GetSlotTime().GetSeconds());
+            NS_LOG_DEBUG("Select a random number (0, " << m_cw - 1 << "): " << slots <<
+                    ", backoffRemain " << m_backoffRemain <<
+                    ", will finish " << m_backoffRemain + Simulator::Now());
+        }
+        m_backoffStart = Simulator::Now();
+        m_backoffTimeoutEvent = Simulator::Schedule(m_backoffRemain, &RescueMacCsma::ChannelAccessGranted, this);
+    }
+
+    void
+    RescueMacCsma::ChannelBecomesBusy() {
+        NS_LOG_FUNCTION("");
+        if (m_ccaTimeoutEvent.IsRunning())
+            m_ccaTimeoutEvent.Cancel();
+        if (m_backoffTimeoutEvent.IsRunning()) {
+            m_backoffTimeoutEvent.Cancel();
+            Time elapse;
+            if (Simulator::Now() > m_backoffStart) {
+                elapse = Simulator::Now() - m_backoffStart;
+            }
+            if (elapse < m_backoffRemain) {
+                m_backoffRemain = m_backoffRemain - elapse;
+                m_backoffRemain = RoundOffTime(m_backoffRemain);
+            }
+            NS_LOG_DEBUG("Freeze backoff! Remain " << m_backoffRemain);
+        }
+        CcaForLifs();
+    }
+
+    void
+    RescueMacCsma::ChannelAccessGranted() {
+        NS_LOG_FUNCTION("");
+
+        //erase queued copies of acked frame
+        for (RelayQueueI it2 = m_pktRelayQueue.begin(); it2 != m_pktRelayQueue.end();) {
+            if (m_arqManager->IsFwdACKed(&(it2->second))) {
+                NS_LOG_INFO("Erase unnecessary frame copy! from: " << it2->second.GetSource() << " to: " << it2->second.GetDestination() << ", seq: " << it2->second.GetSequence());
+                it2 = m_pktRelayQueue.erase(it2);
+            } else
+                it2++;
+        }
+
+        /*for (RelayQueueI it = m_pktRelayQueue.begin (); it != m_pktRelayQueue.end ();)
+          {
+            //if (m_resendAck) break;
+            if (CheckRelayedFrame (*it))
+              {
+                it = m_pktRelayQueue.erase (it);
+                //NS_LOG_DEBUG("erase!");
+              }
+            else
+              {
+                        it++;
+              }
+          }*/
+
+        if (m_ackQueue.size() != 0) {
+
+            //MODIF 3
+            if (!ACK_ENABLED)
+                NS_FATAL_ERROR("Should not have any ACK in queue when ACK disabled");
 
             m_backoffStart = Seconds(0);
             m_backoffRemain = Seconds(0);
-
-            //MODIF
             m_state = WAIT_TX;
-            //            updateControlChannel();
 
-            m_pktData = m_pktQueue.front();
-            m_pktQueue.pop_front();
-            NS_LOG_INFO("dequeue packet from TX queue, size: " << m_pktData->GetSize());
+            m_pktRelay = m_ackQueue.front();
+            m_ackQueue.pop_front();
+            //if (!m_resendAck && m_pktRelay.second.IsACK ())
+            /*if (m_pktRelay.second.IsACK ())
+              m_ackCache.push_front (m_pktRelay); //record ACK in cache*/
+
+            if (m_pktRelay.first == 0)
+                NS_ASSERT("Null packet for ack forward tx");
+
+            NS_LOG_INFO("FORWARD ACK to: " << m_pktRelay.second.GetDestination() << ", seq: " << m_pktRelay.second.GetSequence() << "!");
+            //m_traceAckForward (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
+
+            SendRelayedData();
+            //m_resendAck = false;
+        } else if (m_ctrlPktQueue.size() != 0) {
+            m_backoffStart = Seconds(0);
+            m_backoffRemain = Seconds(0);
+            m_state = WAIT_TX;
+
+            m_pktRelay = m_ctrlPktQueue.front();
+            m_ctrlPktQueue.pop_front();
+
+            if (m_pktRelay.first == 0)
+                NS_ASSERT("Null control packet for tx");
+
+            NS_LOG_INFO("TRANSMIT CONTROL FRAME!");
+            //m_traceCtrlTx (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
+
+            SendRelayedData();
+        } else if (m_pktRelayQueue.size() != 0) {
+            //MODIF 2
+            //    if (ACK_ENABLED) {
+            m_backoffStart = Seconds(0);
+            m_backoffRemain = Seconds(0);
+            m_state = WAIT_TX;
+
+            m_pktRelay = m_pktRelayQueue.front();
+            m_pktRelayQueue.pop_front();
+
+            if (m_pktRelay.first == 0)
+                NS_ASSERT("Null packet for relay tx");
+
+            NS_LOG_INFO("RELAY DATA FRAME! from src: " << m_pktRelay.second.GetSource() << " to dst: " << m_pktRelay.second.GetDestination() << ", seq: " << m_pktRelay.second.GetSequence());
+            //m_traceDataRelay (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktRelay.first, m_pktRelay.second);
+
+            SendRelayedData();
+
+            //MODIF 2
+            //  } else
+            //      NS_LOG_UNCOND(COLOR_RED << "ACK DISABLED, RELAY SHOULD NOT WAIT FOR SIFS" << COLOR_DEFAULT);
+
+        } else if (m_pktRetryQueue.size() != 0) {
+            NS_LOG_DEBUG("SEND RETRY QUEUED PACKET!");
+
+            m_backoffStart = Seconds(0);
+            m_backoffRemain = Seconds(0);
+            m_state = WAIT_TX;
+
+            m_pktData = m_pktRetryQueue.front();
+            m_pktRetryQueue.pop_front();
+            NS_LOG_INFO("dequeue packet from retry TX queue, size: " << m_pktData->GetSize());
 
             if (m_pktData == 0)
                 NS_ASSERT("Queue has null packet");
 
+            NS_LOG_DEBUG("SEND RETRANSMITTED DATA PACKET!");
             //m_traceDataTx (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktData);
             SendData();
-        } else {
-            if (m_ackTimeoutEvent.IsRunning()) {
-                NS_LOG_DEBUG("Awaiting for ACK");
-            } else {
+        } else if (m_pktQueue.size() != 0) {
+            Ptr<Packet> pkt = m_pktQueue.front();
+            RescueMacHeader hdr;
+            pkt->PeekHeader(hdr);
 
-                NS_LOG_DEBUG("No queued frames for TX");
-            }
-        }
+            if (m_arqManager->IsTxAllowed(hdr.GetDestination())) {
+                m_backoffStart = Seconds(0);
+                m_backoffRemain = Seconds(0);
+                m_state = WAIT_TX;
+
+                m_pktData = pkt;
+                m_pktQueue.pop_front();
+                NS_LOG_INFO("dequeue packet from TX queue, size: " << m_pktData->GetSize());
+
+                if (m_pktData == 0)
+                    NS_ASSERT("Queue has null packet");
+
+                NS_LOG_DEBUG("SEND QUEUED DATA PACKET!");
+                //m_traceDataTx (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), m_pktData);
+                SendData();
+            } else
+                NS_LOG_DEBUG("Awaiting for ACK");
+        } else
+            NS_LOG_DEBUG("No queued frames for TX");
+
     }
 
 
@@ -848,7 +1142,7 @@ namespace ns3 {
 
     void
     RescueMacCsma::SendData() {
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
 
         RescueMacHeader hdr;
         m_pktData->PeekHeader(hdr);
@@ -857,101 +1151,71 @@ namespace ns3 {
 
         NS_LOG_DEBUG((hdr.IsRetry() ? "RETRY" : "NOT RETRY"));
 
-        if (!hdr.IsRetry()) {
+        if (!hdr.IsRetry() && (hdr.GetSequence() == 0)) {
             m_pktData->RemoveHeader(hdr);
-            if (m_arqManager != 0) {
-                hdr.SetSequence(m_arqManager->GetNextSequenceNumber(&hdr));
-            } else
-                hdr.SetSequence(m_sequence);
+            hdr.SetSequence(m_arqManager->GetNextSequenceNumber(&hdr));
 
             m_pktData->AddHeader(hdr);
             RescueMacTrailer fcs;
             m_pktData->AddTrailer(fcs);
 
             //store info about sended packet
-            SendSeqList::iterator it = m_createdFrames.find(hdr.GetDestination());
-            if (it != m_createdFrames.end()) {
-                //found destination
-                SeqList::iterator it2 = dstSeqList(it).seqList.find(hdr.GetSequence());
-                if (it2 != dstSeqList(it).seqList.end()) {
-                    //found TXed frame with given SEQ - seq. numbers reuse - overwrite
-                    seqAck(it2).ACKed = false;
-                } else {
-                    //new SEQ number for given destination
-                    dstSeqList(it).seqList.insert(std::pair <uint16_t, bool> (hdr.GetSequence(), false));
-                }
-            } else {
-                //new destination
-                SeqList newSeqList;
-                newSeqList.insert(std::pair <uint16_t, bool> (hdr.GetSequence(), false));
-                m_createdFrames.insert(std::pair <Mac48Address, SeqList> (hdr.GetDestination(), newSeqList));
-            }
+            m_arqManager->ReportNewDataFrame(hdr.GetDestination(), hdr.GetSequence());
         }
 
         m_pktData->PeekHeader(hdr);
         uint32_t pktSize = m_pktData->GetSize();
+        uint16_t seq = hdr.GetSequence();
 
-        NS_LOG_INFO("dst:" << hdr.GetDestination() <<
-                " seq:" << hdr.GetSequence() <<
-                " IL:" << (int) m_interleaver <<
-                " size:" << pktSize <<
-                " retry:" << (hdr.IsRetry() ? "YES" : "NO") <<
-                " #Queue:" << m_pktQueue.size() <<
-                " #relayQueue:" << m_pktRelayQueue.size() <<
-                " #ctrlQueue:" << m_ctrlPktQueue.size() <<
-                " #ackQueue:" << m_ackForwardQueue.size());
+        NS_LOG_FUNCTION("dst:" << hdr.GetDestination() <<
+                "seq:" << seq <<
+                "IL:" << (int) m_interleaver <<
+                "size:" << pktSize <<
+                "retry:" << (hdr.IsRetry() ? "YES" : "NO") <<
+                "#data queue:" << m_pktQueue.size() <<
+                "#retry queue:" << m_pktRetryQueue.size() <<
+                "#relay queue:" << m_pktRelayQueue.size() <<
+                "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                "#ack queue:" << m_ackQueue.size());
 
-        //remember to prevent loops
-        RecvSendSeqList::iterator it = m_sentFrames.find(std::pair<Mac48Address, Mac48Address> (hdr.GetSource(), hdr.GetDestination()));
-        if (it != m_sentFrames.end()) {
-            //found source and destination
-            SeqIlList::iterator it2 = srcDstSeqList(it).seqList.find(hdr.GetSequence());
-            if (it2 != srcDstSeqList(it).seqList.end()) {
-                //found TXed frame with given SEQ - seq. numbers reuse - overwrite
-                seqIlAck(it2).il = m_interleaver;
-                seqIlAck(it2).ACKed = false;
-                seqIlAck(it2).retried = hdr.IsRetry();
-            } else {
-                //new SEQ number for given destination
-                srcDstSeqList(it).seqList.insert(std::pair <uint16_t, struct FrameInfo> (hdr.GetSequence(), FrameInfo(m_interleaver, false, hdr.IsRetry())));
-            }
-        } else {
-            //new source and destination
-            SeqIlList newSeqList;
-            newSeqList.insert(std::pair <uint16_t, struct FrameInfo> (hdr.GetSequence(), FrameInfo(m_interleaver, false, hdr.IsRetry())));
-            m_sentFrames.insert(std::pair<std::pair<Mac48Address, Mac48Address>, SeqIlList> (std::pair<Mac48Address, Mac48Address> (hdr.GetSource(), hdr.GetDestination()), newSeqList));
-        }
+
+        RescuePhyHeader phyHdr = RescuePhyHeader(hdr.GetSource(),
+                hdr.GetSource(),
+                hdr.GetDestination(),
+                hdr.GetType(),
+                hdr.GetSequence(),
+                m_interleaver);
+
+        hdr.IsRetry() ? phyHdr.SetRetry() : phyHdr.SetNoRetry();
+        phyHdr.SetDistributedMacProtocol();
+
+        m_arqManager->ConfigurePhyHeader(&phyHdr);
 
         RescueMode mode = m_remoteStationManager->GetDataTxMode(hdr.GetDestination(), m_pktData, pktSize);
 
         if (hdr.GetDestination() != m_hiMac->GetBroadcast()) // Unicast
         {
             NS_LOG_DEBUG("pktData total Size: " << m_pktData->GetSize());
-            if (SendPacket(m_pktData, mode, m_interleaver)) {
-                //Time ackTimeout = GetDataDuration (m_pktData, mode) + GetSifsTime () + GetCtrlDuration (RESCUE_MAC_PKT_TYPE_ACK, mode) + GetSlotTime ();
-                Ptr<Packet> p = m_pktData->Copy();
-                m_ackTimeoutEvent = Simulator::Schedule(m_basicAckTimeout, &RescueMacCsma::AckTimeout, this, p);
-                NS_LOG_DEBUG("ACK TIMEOUT TIMER STARTED");
+            NS_LOG_DEBUG("SEND DATA PACKET! to dst: " << phyHdr.GetDestination() << ", seq: " << phyHdr.GetSequence());
+            if (SendPacket(std::pair<Ptr<Packet>, RescuePhyHeader> (m_pktData->Copy(), phyHdr), mode)) {
+                m_arqManager->ReportDataTx(m_pktData->Copy());
+
             } else {
                 StartOver(m_pktData);
             }
         } else // Broadcast
         {
-            /*if (SendPacket (m_pktData, mode, 0))
-              {
-              }
-            else
-              {
-                StartOver (m_pktData);
-              }*/
+
         }
     }
 
     void
     RescueMacCsma::SendRelayedData() {
         NS_LOG_FUNCTION("src:" << m_pktRelay.second.GetSource() <<
-                " dst:" << m_pktRelay.second.GetDestination() <<
-                " seq:" << m_pktRelay.second.GetSequence());
+                "dst:" << m_pktRelay.second.GetDestination() <<
+                "seq:" << m_pktRelay.second.GetSequence());
+
+        m_pktTx = m_pktRelay.first;
 
         RescueMode mode;
         switch (m_pktRelay.second.GetType()) {
@@ -972,34 +1236,33 @@ namespace ns3 {
         {
             m_pktRelay.second.SetSender(m_hiMac->GetAddress());
             if (SendPacket(m_pktRelay, mode)) {
+                if (m_pktRelay.second.IsDataFrame())
+                    m_arqManager->ReportRelayDataTx(&(m_pktRelay.second));
             } else {
                 StartOver(m_pktRelay);
             }
-            m_pktRelay.first = 0;
-            m_pktRelay.second = 0;
         } else // Broadcast
         {
             if (SendPacket(m_pktRelay, mode)) {
             } else {
-
                 StartOver(m_pktRelay);
             }
-            m_pktRelay.first = 0;
-            m_pktRelay.second = 0;
         }
     }
 
     void
-    RescueMacCsma::SendAck(Mac48Address dest, uint16_t seq, RescueMode dataTxMode, SnrPerTag tag) {
-        NS_LOG_FUNCTION(this << dest << seq << dataTxMode);
-        NS_LOG_INFO("SEND ACK");
+    RescueMacCsma::SendAck(RescuePhyHeader ackHdr, RescueMode dataTxMode, SnrPerTag tag) {
+        NS_LOG_INFO("SEND ACK from: " << ackHdr.GetSource() << " to: " << ackHdr.GetDestination() << ", seq: " << ackHdr.GetSequence());
+        NS_LOG_FUNCTION("to:" << ackHdr.GetDestination());
+
+        //MODIF 2
+        if (!ACK_ENABLED)
+            NS_FATAL_ERROR(COLOR_RED << "SHOULD NOT SEND ACK; ACK DISABLED" << COLOR_DEFAULT);
 
         Ptr<Packet> pkt = Create<Packet> (0);
-        RescuePhyHeader ackHdr = RescuePhyHeader(m_hiMac->GetAddress(), dest, RESCUE_PHY_PKT_TYPE_E2E_ACK);
-        ackHdr.SetSequence(seq);
         pkt->AddPacketTag(tag);
 
-        RescueMode mode = m_remoteStationManager->GetAckTxMode(dest, dataTxMode);
+        RescueMode mode = m_remoteStationManager->GetAckTxMode(ackHdr.GetDestination(), dataTxMode);
         std::pair<Ptr<Packet>, RescuePhyHeader> ackPkt(pkt, ackHdr);
 
         //m_traceAckTx (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), pkt, ackHdr);
@@ -1015,18 +1278,18 @@ namespace ns3 {
                 && ((m_opEnd == Seconds(0))
                 || (Simulator::Now() + GetDataDuration(pkt, mode) + GetSifsTime() < m_opEnd))) {
             if (m_phy->SendPacket(pkt, mode, il)) {
+                m_state = TX;
 
                 //MODIF
-                m_state = TX;
                 if (CC_ENABLED)
                     updateLocalControlChannel();
 
                 m_pktTx = pkt;
                 return true;
             } else {
+                m_state = IDLE;
 
                 //MODIF
-                m_state = IDLE;
                 if (CC_ENABLED)
                     updateLocalControlChannel();
             }
@@ -1043,16 +1306,18 @@ namespace ns3 {
                 && ((m_opEnd == Seconds(0))
                 || (Simulator::Now() + GetDataDuration(relayedPkt.first, mode) + GetSifsTime() < m_opEnd))) {
             if (m_phy->SendPacket(relayedPkt, mode)) {
-                //MODIF
                 m_state = TX;
+
+                //MODIF
                 if (CC_ENABLED)
                     updateLocalControlChannel();
 
                 m_pktTx = relayedPkt.first;
                 return true;
             } else {
-
                 m_state = IDLE;
+
+                //MODIF
                 if (CC_ENABLED)
                     updateLocalControlChannel();
             }
@@ -1062,28 +1327,57 @@ namespace ns3 {
 
     void
     RescueMacCsma::SendPacketDone(Ptr<Packet> pkt) {
+        //MODIF
         if (CC_ENABLED)
             printTopology();
-        NS_LOG_FUNCTION("state:" << StateToString(m_state));
 
-        if (m_state != TX /*|| m_pktTx != pkt*/) {
+        NS_LOG_FUNCTION("state:" << StateToString(m_state));
+        RescuePhyHeader phyHdr;
+        pkt->RemoveHeader(phyHdr);
+
+        if (m_state != TX || m_pktTx != pkt) {
             NS_LOG_DEBUG("Something is wrong!");
+            //if (phyHdr.GetSource () == m_hiMac->GetAddress ())
+            //  StartOver (pkt);
+            //else
+            StartOver(std::pair<Ptr<Packet>, RescuePhyHeader> (pkt, phyHdr));
             return;
         }
-        //MODIF
         m_state = IDLE;
-        updateControlChannel();
 
+        //MODIF
+        if (CC_ENABLED)
+            updateControlChannel();
         RescueMacHeader hdr;
-        pkt->PeekHeader(hdr);
-        switch (hdr.GetType()) {
+
+        switch (phyHdr.GetType()) {
             case RESCUE_MAC_PKT_TYPE_DATA:
-                if (hdr.GetDestination() == m_hiMac->GetBroadcast()) {
-                    //don't know what to do
-                    SendDataDone();
-                    CcaForLifs();
-                    return;
+                pkt->PeekHeader(hdr);
+                //MODIF 2
+                //Check relaying + bad hook
+                if (CC_ENABLED && !ACK_ENABLED)
+                    if (Simulator::Now() > Seconds(10)) {
+                        NS_LOG_DEBUG(LOG_STR << COLOR_BLUE << "SendPacketDone : SCHEDULING CHECK AT " <<
+                                (Simulator::Now() + GetSifsTime() + GetChannelDelay() + NanoSeconds(1)).GetMicroSeconds() <<
+                                "(" << GetSifsTime().GetMicroSeconds() <<
+                                // ", " << GetTxDuration().GetMicroSeconds() <<
+                                ", " << GetChannelDelay().GetMicroSeconds() <<
+                                ")" << COLOR_DEFAULT);
+                        Simulator::Schedule(GetSifsTime() + GetChannelDelay() + MicroSeconds(1), &RescueMacCsma::CheckRelaying, this, hdr, pkt);
+                    }
+
+                //MODIF 3
+                if (!CC_ENABLED && !ACK_ENABLED) // SimpleMAC without ACK
+                {
+                    if (m_hiMac->GetAddress() == hdr.GetSource()) {
+                        NS_LOG_DEBUG("SimpleMAC without ACK. Stop ACK wait");
+                        m_arqManager->RelayingStopAck(hdr.GetDestination(), hdr.GetSequence());
+                    }
                 }
+
+                SendDataDone();
+                CcaForLifs();
+                return;
                 break;
             case RESCUE_MAC_PKT_TYPE_ACK:
             case RESCUE_MAC_PKT_TYPE_RR:
@@ -1100,10 +1394,11 @@ namespace ns3 {
     void
     RescueMacCsma::SendDataDone() {
 
-        NS_LOG_FUNCTION(this);
-        m_sequence++;
+        NS_LOG_FUNCTION("");
+        //m_sequence++;
         NS_LOG_DEBUG("RESET PACKET");
         m_pktData = 0;
+        m_pktRelay = std::pair<Ptr<Packet>, RescuePhyHeader> (0, 0);
         m_backoffStart = Seconds(0);
         m_backoffRemain = Seconds(0);
         // According to IEEE 802.11-2007 std (p261)., CW should be reset to minimum value
@@ -1114,27 +1409,35 @@ namespace ns3 {
 
     void
     RescueMacCsma::StartOver(Ptr<Packet> pkt) {
-
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
         NS_LOG_INFO("return packet to the front of TX queue");
         m_pktData = 0;
-        m_pktQueue.push_front(pkt);
+        RescueMacHeader hdr;
+        pkt->PeekHeader(hdr);
+        if (hdr.IsRetry())
+            m_pktRetryQueue.push_front(pkt);
+        else
+            m_pktQueue.push_front(pkt);
         m_backoffStart = Seconds(0);
         m_backoffRemain = Seconds(0);
+
+        //MODIF DEBUG 876876
+        m_state = IDLE;
+
         CcaForLifs();
     }
 
     void
     RescueMacCsma::StartOver(std::pair<Ptr<Packet>, RescuePhyHeader> pktHdr) {
-        NS_LOG_FUNCTION(this);
-        NS_LOG_INFO("return packet to the front of TX queue");
+        NS_LOG_FUNCTION("");
+        NS_LOG_INFO("_return packet to the front of TX queue");
         switch (pktHdr.second.GetType()) {
             case RESCUE_PHY_PKT_TYPE_DATA:
                 m_pktRelayQueue.push_front(pktHdr);
                 break;
             case RESCUE_PHY_PKT_TYPE_E2E_ACK:
             case RESCUE_PHY_PKT_TYPE_PART_ACK:
-                m_ackForwardQueue.push_front(pktHdr);
+                m_ackQueue.push_front(pktHdr);
                 break;
             case RESCUE_PHY_PKT_TYPE_RR:
                 m_ctrlPktQueue.push_front(pktHdr);
@@ -1144,8 +1447,11 @@ namespace ns3 {
                 break;
         }
 
+        m_pktRelay = std::pair<Ptr<Packet>, RescuePhyHeader> (0, 0);
         m_backoffStart = Seconds(0);
         m_backoffRemain = Seconds(0);
+        //MODIF 5
+        m_state = IDLE;
         CcaForLifs();
     }
 
@@ -1154,121 +1460,115 @@ namespace ns3 {
 
     void
     RescueMacCsma::ReceiveData(Ptr<Packet> pkt, RescuePhyHeader phyHdr, RescueMode mode, bool correctData) {
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
         if (correctData) {
             ReceiveCorrectData(pkt, phyHdr, mode);
         } else //uncorrect data
         {
             //check - have I already received the correct/complete frame?
-            RecvSeqList::iterator it = m_receivedFrames.find(phyHdr.GetSource());
-            if (it != m_receivedFrames.end()) {
-                if (srcSeq(it).seq >= phyHdr.GetSequence()) {
-                    NS_LOG_INFO("(unnecessary DATA frame copy) DROP!");
-                } else {
-
-                    NS_LOG_INFO("THE FRAME COPY WAS STORED!");
-                    //m_phy->StoreFrameCopy (pkt, phyHdr);
-                }
-            }
-
+            if (m_arqManager->CheckRxSequence(phyHdr.GetSource(), phyHdr.GetSequence(), phyHdr.IsContinousAckEnabled())) {
+                NS_LOG_INFO("THE FRAME COPY WAS STORED!");
+                m_arqManager->ReportDamagedFrame(&phyHdr);
+            } else
+                NS_LOG_INFO("(unnecessary DATA frame copy) DROP!");
         }
     }
 
     void
     RescueMacCsma::ReceiveCorrectData(Ptr<Packet> pkt, RescuePhyHeader phyHdr, RescueMode mode) {
-        NS_LOG_FUNCTION(this << pkt << phyHdr << mode);
+        NS_LOG_FUNCTION("");
 
         RescueMacHeader hdr;
         pkt->RemoveHeader(hdr);
         RescueMacTrailer fcs;
         pkt->RemoveTrailer(fcs);
-        NS_LOG_FUNCTION(this << "src:" << phyHdr.GetSource() <<
+        NS_LOG_FUNCTION("src:" << phyHdr.GetSource() <<
                 "sequence: " << phyHdr.GetSequence());
 
-        //MODIF
         m_state = WAIT_TX;
-        updateControlChannel();
-
-        NS_LOG_DEBUG(COLOR_GREEN << "RECEIVED CORRECT DATA KIKOOOO" << COLOR_DEFAULT);
+        //MODIF
+        if (CC_ENABLED)
+            updateControlChannel();
+        NS_LOG_DEBUG(COLOR_GREEN << "RECEIVED CORRECT DATA ==> " << phyHdr.GetSequence() << COLOR_DEFAULT);
 
         // forward upper layer
-        if (IsNewSequence(phyHdr.GetSource(), phyHdr.GetSequence())) {
+
+        RescuePhyHeader ackHdr = RescuePhyHeader(RESCUE_PHY_PKT_TYPE_E2E_ACK);
+        if (m_arqManager->CheckRxFrame(&phyHdr, &ackHdr)) {
             NS_LOG_INFO("DATA RX OK!");
-            SnrPerTag tag;
-            pkt->PeekPacketTag(tag); //to send back SnrPerTag - for possible use in the future (multi rate control etc.)
-            m_sendAckEvent = Simulator::Schedule(GetSifsTime(), &RescueMacCsma::SendAck, this, phyHdr.GetSource(), phyHdr.GetSequence(), mode, tag);
             //m_forwardUpCb (pkt, phyHdr.GetSource (), phyHdr.GetDestination ());
             m_hiMac->ReceivePacket(pkt, phyHdr);
         } else {
-
+            NS_LOG_DEBUG(COLOR_RED << "DUPLICATE?" << COLOR_DEFAULT);
             NS_LOG_INFO("(duplicate) DROP!");
+        }
+
+        if (ackHdr.GetDestination() != Mac48Address("00:00:00:00:00:00")) {
+            SnrPerTag tag;
+            pkt->PeekPacketTag(tag); //to send back SnrPerTag - for possible use in the future (multi rate control etc.)
+            //MODIF 2
+
+            if (ACK_ENABLED)
+                m_sendAckEvent = Simulator::Schedule(GetSifsTime(), &RescueMacCsma::SendAck, this, ackHdr, mode, tag);
         }
     }
 
     void
     RescueMacCsma::ReceiveRelayData(Ptr<Packet> pkt, RescuePhyHeader phyHdr, RescueMode mode) {
-        NS_LOG_FUNCTION(this << " src:" << phyHdr.GetSource() <<
-                " dst:" << phyHdr.GetDestination() <<
-                " seq:" << phyHdr.GetSequence() <<
-                " mode:" << mode);
+        SnrPerTag tag;
+        pkt->PeekPacketTag(tag); //to send back SnrPerTag - for possible use in the future (multi rate control etc.)
 
-        //check - have I recently transmitted this frame? have I transmitted an ACK for it?
-        bool tx = true;
-        RecvSendSeqList::iterator it = m_sentFrames.find(std::pair<Mac48Address, Mac48Address> (phyHdr.GetSource(), phyHdr.GetDestination()));
-        if (it != m_sentFrames.end()) {
-            //found source and destination
-            SeqIlList::iterator it2 = srcDstSeqList(it).seqList.find(phyHdr.GetSequence());
-            if (it2 != srcDstSeqList(it).seqList.end()) {
-                //found TXed frame with given SEQ - seq. numbers reuse - overwrite
-                if ((seqIlAck(it2).ACKed) //ACKed?
-                        && (phyHdr.IsRetry())) {
-                    //frame was already ACKed and unnecessary retransmission is detected
-                    ResendAckFor(std::pair<Ptr<Packet>, RescuePhyHeader> (pkt, phyHdr));
-                    tx = false;
-                } else if (seqIlAck(it2).il == phyHdr.GetInterleaver()) {
-                    //frame was not already ACKed but we transmitted copy of given TX try, just break
-                    tx = false;
-                }//otherwise - it is new TX try, forward it!
-                else {
-                    //another retry detected, update interleaver
-                    seqIlAck(it2).il = phyHdr.GetInterleaver();
-                    seqIlAck(it2).retried = true;
-                    if (!phyHdr.IsRetry())
-                        NS_ASSERT("new interleaver but no retry!");
-                }
-            } else {
-                //new SEQ number for given destination
-                srcDstSeqList(it).seqList.insert(std::pair <uint16_t, struct FrameInfo> (phyHdr.GetSequence(), FrameInfo(phyHdr.GetInterleaver(), false, phyHdr.IsRetry())));
-            }
-        } else {
-            //new source and destination
-            SeqIlList newSeqList;
-            newSeqList.insert(std::pair <uint16_t, struct FrameInfo> (phyHdr.GetSequence(), FrameInfo(phyHdr.GetInterleaver(), false, phyHdr.IsRetry())));
-            m_sentFrames.insert(std::pair<std::pair<Mac48Address, Mac48Address>, SeqIlList> (std::pair<Mac48Address, Mac48Address> (phyHdr.GetSource(), phyHdr.GetDestination()), newSeqList));
-        }
+        NS_LOG_FUNCTION("src:" << phyHdr.GetSource() <<
+                "dst:" << phyHdr.GetDestination() <<
+                "seq:" << phyHdr.GetSequence() <<
+                "mode:" << mode <<
+                "ber:" << tag.GetBER());
 
-        //ask routing - should I forward it?
-        /*if (tx)
-            {
-        //====== PLACE FOR ROUTING INTERACTION ======
+        std::pair<RelayBehavior, RescuePhyHeader> txAck = m_arqManager->ReportRelayFrameRx(&phyHdr, tag.GetBER());
 
-            }*/
 
-        if (tx) {
-            NS_LOG_INFO("FRAME TO RELAY!");
-
-            //phyHdr.SetSender (m_hiMac->GetAddress ());
-            std::pair<Ptr<Packet>, RescuePhyHeader> pktRelay(pkt, phyHdr);
-            m_pktRelayQueue.push_back(pktRelay);
-        } else {
-            NS_LOG_INFO("(DATA already TX-ed) DROP!");
+        switch (txAck.first) {
+            case FORWARD:
+                NS_LOG_INFO("PHY HDR OK! FRAME TO RELAY! src: " << phyHdr.GetSource() << ", dst: " << phyHdr.GetDestination() << ", from: " << phyHdr.GetSender() << ", seq: " << phyHdr.GetSequence());
+                EnqueueRelay(pkt, phyHdr);
+                break;
+            case REPLACE_COPY:
+                NS_LOG_INFO("FRAME TO RELAY! (instead of the worse copy) src: " << phyHdr.GetSource() << " dst: " << phyHdr.GetDestination() << ", seq: " << phyHdr.GetSequence());
+                for (RelayQueueI it = m_pktRelayQueue.begin(); it != m_pktRelayQueue.end(); it++)
+                    if ((it->second.GetSource() == phyHdr.GetSource())
+                            && (it->second.GetDestination() == phyHdr.GetDestination())
+                            && (it->second.GetSequence() == phyHdr.GetSequence())
+                            && (it->second.GetInterleaver() == phyHdr.GetInterleaver())) {
+                        //found enqueued copy, switch with better one
+                        NS_LOG_INFO("Erase unnecessary frame copy! from: " << it->second.GetSource() << " to: " << it->second.GetDestination() << ", seq: " << it->second.GetSequence());
+                        it = m_pktRelayQueue.erase(it);
+                        it = m_pktRelayQueue.insert(it, std::pair<Ptr<Packet>, RescuePhyHeader> (pkt, phyHdr));
+                        break;
+                    }
+                break;
+            case RESEND_ACK:
+                NS_LOG_INFO("UNNECESSARY RETRANSMISSION DETECTED! DROP and resend ACK! src: " << txAck.second.GetSource() << " dst: " << txAck.second.GetDestination() << ", seq: " << txAck.second.GetSequence());
+                m_sendAckEvent = Simulator::Schedule(GetSifsTime(), &RescueMacCsma::SendAck, this, txAck.second, mode, tag);
+                //check ACK queue, if this ACK frame is queued - erase it!
+                for (RelayQueueI it = m_ackQueue.begin(); it != m_ackQueue.end(); it++)
+                    if (m_arqManager->ACKcomp(&(it->second), &(txAck.second))) {
+                        //found enqueued ACK, erase it
+                        it = m_ackQueue.erase(it);
+                        NS_LOG_INFO("Erase enqueued ACK and TX it!");
+                        break;
+                    }
+                break;
+            case DROP:
+                NS_LOG_INFO("UNNECESSARY COPY! DROP! src: " << phyHdr.GetSource() << " dst: " << phyHdr.GetDestination() << ", seq: " << phyHdr.GetSequence());
+                break;
+            default:
+                break;
         }
 
         //MODIF
-        m_state = IDLE;
-        updateControlChannel();
-
-        CcaForLifs();
+        //m_state = IDLE;
+        if (CC_ENABLED)
+            updateControlChannel();
 
         return;
     }
@@ -1282,112 +1582,104 @@ namespace ns3 {
     }
 
     void
-    RescueMacCsma::ReceiveAck(Ptr<Packet> ackPkt, RescuePhyHeader phyHdr, double ackSnr, RescueMode ackMode) {
-        NS_LOG_FUNCTION("src:" << phyHdr.GetSource() <<
-                "dst:" << phyHdr.GetDestination() <<
-                "seq:" << phyHdr.GetSequence());
+    RescueMacCsma::ReceiveAck(Ptr<Packet> ackPkt, RescuePhyHeader ackHdr, double ackSnr, RescueMode ackMode) {
+        NS_LOG_FUNCTION("src:" << ackHdr.GetSource() <<
+                "dst:" << ackHdr.GetDestination() <<
+                "seq:" << ackHdr.GetSequence());
 
-        //MODIF
         m_state = IDLE;
-        updateControlChannel();
+        //MODIF
+        if (CC_ENABLED)
+            updateControlChannel();
 
-        if (phyHdr.GetDestination() == m_hiMac->GetAddress()) {
+        //check - have I recently received this ACK?
+        for (AckCacheI it = m_ackCache.begin(); it != m_ackCache.end(); it++) {
+            if (it->expires < ns3::Simulator::Now()) {
+                NS_LOG_INFO("Expired ACK in cache - erase!");
+                it = m_ackCache.erase(it);
+            } else if (m_arqManager->ACKcomp(&(it->ack.second), &(ackHdr))) {
+                //found cached ACK, dont process it
+                NS_LOG_INFO("Duplicated ACK!");
+                CcaForLifs();
+                return;
+            }
+        }
+
+        //store frame in ACK cache
+        StoredAck newIns;
+        newIns.ack = std::pair<Ptr<Packet>, RescuePhyHeader> (ackPkt, ackHdr);
+        newIns.expires = ns3::Simulator::Now() + m_arqManager->GetTimeoutFor(&ackHdr);
+        m_ackCache.push_front(newIns);
+
+        if (ackHdr.GetDestination() == m_hiMac->GetAddress()) {
             //check - have I recently transmitted frame which is acknowledged?
-            SendSeqList::iterator it = m_createdFrames.find(phyHdr.GetSource());
-            if (it != m_createdFrames.end()) {
-                //found destination
-                SeqList::iterator it2 = dstSeqList(it).seqList.find(phyHdr.GetSequence());
-                if (it2 != dstSeqList(it).seqList.end()) {
-                    //found TXed frame with given SEQ - notify frame ACK
-                    if (!seqAck(it2).ACKed) {
-                        NS_LOG_INFO("GOT ACK - DATA TX OK!");
-                        seqAck(it2).ACKed = true;
-                        m_ackTimeoutEvent.Cancel();
-                        SnrPerTag tag;
-                        ackPkt->PeekPacketTag(tag);
-                        m_remoteStationManager->ReportDataOk(phyHdr.GetSource(),
-                                ackSnr, ackMode,
-                                tag.GetSNR(), /*tag.GetPER ()*/ tag.GetBER());
-                        //m_traceSendDataDone (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), phyHdr.GetSource (), true);
-                        SendDataDone();
-                    } else
-                        NS_LOG_INFO("DUPLICATED ACK");
-                } else {
-                    //new SEQ number for given destination???
-                    NS_LOG_INFO("ACK ERROR (frame with given seq. no. was not originated here)");
+            int retryCounter = m_arqManager->ReceiveAck(&ackHdr);
+
+            if (retryCounter >= 0) {
+                NS_LOG_INFO("GOT ACK - DATA TX OK! from: " << ackHdr.GetSource() << ", seq: " << ackHdr.GetSequence());
+                SnrPerTag tag;
+                ackPkt->PeekPacketTag(tag);
+                m_remoteStationManager->ReportDataOk(ackHdr.GetSource(),
+                        ackSnr, ackMode,
+                        tag.GetSNR(), tag.GetBER(),
+                        (uint16_t) retryCounter);
+
+                //check for unnecessary retransmissions in retry queue
+                if (m_pktRetryQueue.size() > 0) {
+                    for (QueueI it = m_pktRetryQueue.begin(); it != m_pktRetryQueue.end(); it++) {
+                        RescueMacHeader hdr;
+                        (*it)->PeekHeader(hdr);
+                        if (m_arqManager->IsRetryACKed(&hdr)) {
+                            it = m_pktRetryQueue.erase(it);
+                            NS_LOG_INFO("Erase unnecessary frame retry!");
+                            //it++;
+                        }
+                        //else
+                        //  it++;
+                    }
                 }
-            } else {
-                //ACK for other
-                NS_LOG_INFO("ACK ERROR (acknowledged frame was not originated here)");
+
+                SendDataDone();
             }
         } else {
-            //check - have I recently transmitted frame which is acknowledgded here?
-            RecvSendSeqList::iterator it = m_sentFrames.find(std::pair<Mac48Address, Mac48Address> (phyHdr.GetDestination(), phyHdr.GetSource()));
-            if (it != m_sentFrames.end()) {
-                //found source and destination
-                SeqIlList::iterator it2 = srcDstSeqList(it).seqList.find(phyHdr.GetSequence());
-                if (it2 != srcDstSeqList(it).seqList.end()) {
-                    //found TXed frame with given SEQ
-                    if (!seqIlAck(it2).ACKed) //ACKed?
-                    {
-                        seqIlAck(it2).ACKed = true;
-
-                        //erase queued copies of acked frame
-                        bool found = false;
-                        for (RelayQueueI it = m_pktRelayQueue.begin(); it != m_pktRelayQueue.end();) {
-                            if ((it->second.GetSource() == phyHdr.GetDestination())
-                                    && (it->second.GetDestination() == phyHdr.GetSource())
-                                    && (it->second.GetSequence() == phyHdr.GetSequence())) {
-                                it = m_pktRelayQueue.erase(it);
-                                NS_LOG_INFO("Erase unnecessary frame copy!");
-                                found = true;
-                            } else
-                                it++;
-                        }
-
-                        NS_LOG_FUNCTION("#queue:" << m_pktQueue.size() <<
-                                "#relay queue:" << m_pktRelayQueue.size() <<
-                                "#ctrl queue:" << m_ctrlPktQueue.size() <<
-                                "#ack queue:" << m_ackForwardQueue.size());
-
-                        /* Forward ACK only if:
-                         * - retry frame was detected - links may be corrupted so multipath ACK forwarding may be more reliable
-                         * or:
-                         * - there was no enqueued copies - probably this station is on the best TX path so it should forward this ACK
-                         */
-                        if (seqIlAck(it2).retried || !found) {
-                            NS_LOG_INFO("ACK to forward!");
-
-                            std::pair<Ptr<Packet>, RescuePhyHeader> forwardAck(ackPkt, phyHdr);
-                            m_ackForwardQueue.push_back(forwardAck);
-                        }
-                    } else {
-                        NS_LOG_INFO("(ACK already received) DROP!");
-                    }
-                } else {
-                    //new SEQ number for given destination
-                    NS_LOG_INFO("(ACK for frame which was not relayed here) DROP!");
+            NS_LOG_INFO("ACK to forward? from: " << ackHdr.GetSource() << " to: " << ackHdr.GetDestination() << ", seq: " << ackHdr.GetSequence());
+            if (m_arqManager->ReportAckToFwd(&ackHdr)) {
+                //erase queued copies of acked frame
+                for (RelayQueueI it2 = m_pktRelayQueue.begin(); it2 != m_pktRelayQueue.end();) {
+                    if (m_arqManager->IsFwdACKed(&(it2->second))) {
+                        NS_LOG_INFO("Erase unnecessary frame copy! from: " << it2->second.GetSource() << " to: " << it2->second.GetDestination() << ", seq: " << it2->second.GetSequence());
+                        it2 = m_pktRelayQueue.erase(it2);
+                    } else
+                        it2++;
                 }
-            } else {
-                //new source and destination
-                NS_LOG_INFO("(ACK for frame which was not relayed here) DROP!");
+
+                NS_LOG_FUNCTION("#data queue:" << m_pktQueue.size() <<
+                        "#retry queue:" << m_pktRetryQueue.size() <<
+                        "#relay queue:" << m_pktRelayQueue.size() <<
+                        "#ctrl queue:" << m_ctrlPktQueue.size() <<
+                        "#ack queue:" << m_ackQueue.size());
+
+                NS_LOG_INFO("ACK to forward!");
+
+                EnqueueAck(ackPkt, ackHdr);
             }
-
-            CcaForLifs();
-
-            return;
         }
+
+        CcaForLifs();
+
+        return;
     }
 
     void
     RescueMacCsma::ReceiveResourceReservation(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
 
         NS_LOG_FUNCTION("");
+        m_hiMac->ReceiveResourceReservation(pkt, phyHdr);
     }
 
     void
     RescueMacCsma::ReceivePacket(Ptr<RescuePhy> phy, Ptr<Packet> pkt) {
-        NS_LOG_FUNCTION(this);
+        NS_LOG_FUNCTION("");
         ChannelBecomesBusy();
         switch (m_state) {
             case WAIT_TX:
@@ -1395,10 +1687,13 @@ namespace ns3 {
             case WAIT_RX:
             case BACKOFF:
             case IDLE:
-                //MODIF
                 m_state = RX;
-                m_controlChannel = false; //re-trigger neighbor update upon reception
-                updateControlChannel();
+                //MODIF
+                if (CC_ENABLED) {
+                    //re-trigger neighbor update upon reception
+                    m_controlChannel = false;
+                    updateControlChannel();
+                }
 
                 break;
             case TX:
@@ -1411,11 +1706,11 @@ namespace ns3 {
     RescueMacCsma::ReceivePacketDone(Ptr<RescuePhy> phy, Ptr<Packet> pkt, RescuePhyHeader phyHdr,
             double snr, RescueMode mode,
             bool correctPhyHdr, bool correctData, bool wasReconstructed) {
-        NS_LOG_FUNCTION(this);
-
-        //MODIF
+        NS_LOG_FUNCTION("");
         m_state = IDLE;
-        updateControlChannel();
+        //MODIF
+        if (CC_ENABLED)
+            updateControlChannel();
 
         if (!correctPhyHdr) {
             NS_LOG_INFO("PHY HDR DAMAGED - DROP!");
@@ -1443,20 +1738,26 @@ namespace ns3 {
                         } else if (phyHdr.GetDestination() != m_hiMac->GetAddress()) {
                             NS_LOG_INFO("PHY HDR OK!" <<
                                     ", DATA: " << (correctData ? "PER OK!, FRAME TO RELAY ?!" : "UNUSABLE - DROP!"));
-                            if (correctData) {
+                            if (correctData)
                                 ReceiveRelayData(pkt, phyHdr, mode);
-                            } else {
-                                CcaForLifs();
-                                return;
-                            }
                         } else {
                             NS_LOG_INFO("PHY HDR OK!" <<
                                     ", DATA: " << (correctData ? "OK!" : "DAMAGED!") <<
-                                    ", RECONSTRUCTION STATUS: " << ((wasReconstructed) ? (correctData ? "SUCCESS" : "MORE COPIES NEEDED") : "NOT NEEDED"));
+                                    ", RECONSTRUCTION STATUS: " << ((wasReconstructed) ? (correctData ? "SUCCESS" : "MORE COPIES NEEDED") : "NOT NEEDED") <<
+                                    ", src: " << phyHdr.GetSource() << ", dst: " << phyHdr.GetDestination() << ", seq: " << phyHdr.GetSequence());
                             ReceiveData(pkt, phyHdr, mode, correctData);
+                        }
+                        if (!m_sendAckEvent.IsRunning()) {
+                            m_state = IDLE;
+                            CcaForLifs();
                         }
                         break;
                     case RESCUE_PHY_PKT_TYPE_E2E_ACK:
+
+                        //MODIF 2
+                        if (!ACK_ENABLED)
+                            NS_FATAL_ERROR("RECEIVED AN ACK. Something went wrong !!");
+
                         ReceiveAck(pkt, phyHdr, snr, mode);
                         break;
                     case RESCUE_PHY_PKT_TYPE_PART_ACK:
@@ -1473,125 +1774,16 @@ namespace ns3 {
 
                         break;
                 }
+                return;
             }
         }
     }
-
-
-
-    // -------------------------- Timeout ----------------------------------
-
-    void
-    RescueMacCsma::AckTimeout(Ptr<Packet> pkt) {
-        RescueMacHeader hdr;
-        pkt->RemoveHeader(hdr);
-
-        NS_LOG_FUNCTION("try: " << m_remoteStationManager->GetRetryCount(hdr.GetDestination()));
-        NS_LOG_INFO("!!! ACK TIMEOUT !!!");
-        //m_state = IDLE;
-        m_remoteStationManager->ReportDataFailed(hdr.GetDestination());
-        //m_traceAckTimeout (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), pkt, hdr);
-
-        if (m_remoteStationManager->NeedDataRetransmission(hdr.GetDestination(), pkt)) {
-            NS_LOG_INFO("RETRANSMISSION");
-            hdr.SetRetry();
-            pkt->AddHeader(hdr);
-            StartOver(pkt);
-            //SendData ();
-        } else {
-            // Retransmission is over the limit. Drop it!
-
-            NS_LOG_INFO("DATA TX FAIL!");
-            m_remoteStationManager->ReportFinalDataFailed(hdr.GetDestination());
-            //m_traceSendDataDone (m_device->GetNode ()->GetId (), m_device->GetIfIndex (), hdr.GetDestination (), false);
-            SendDataDone();
-        }
-    }
-
-
 
     // --------------------------- ETC -------------------------------------
 
-    bool
-    RescueMacCsma::CheckRelayedFrame(std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt) {
-        NS_LOG_FUNCTION(this);
-        bool rx = false;
-
-        //check - have I recently received ACK for this DATA fame copy?
-        RecvSendSeqList::iterator it = m_sentFrames.find(std::pair<Mac48Address, Mac48Address> (relayedPkt.second.GetSource(), relayedPkt.second.GetDestination()));
-        if (it != m_sentFrames.end()) {
-            //found source and destination
-            SeqIlList::iterator it2 = srcDstSeqList(it).seqList.find(relayedPkt.second.GetSequence());
-            if (it2 != srcDstSeqList(it).seqList.end()) {
-                //found TXed frame with given SEQ
-                if (seqIlAck(it2).ACKed) //ACKed?
-                {
-                    NS_LOG_INFO("RELAYED FRAME (src: " << srcDstSeqList(it).src <<
-                            ", dst: " << srcDstSeqList(it).dst <<
-                            ", seq: " << seqIlAck(it2).seq <<
-                            ") was already ACKed, DROP!");
-                    rx = true;
-
-                    if (seqIlAck(it2).il != relayedPkt.second.GetInterleaver()) //new unnecessary retry detected
-                        ResendAckFor(relayedPkt);
-                }
-            }
-        }
-
-        return rx;
-    }
-
-    void
-    RescueMacCsma::ResendAckFor(std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt) {
-        NS_LOG_INFO("UNNECESSARY RETRANSMISSION DETECTED!");
-        NS_LOG_FUNCTION(relayedPkt.first << relayedPkt.second);
-
-        for (RelayQueueI it = m_ackCache.begin(); it != m_ackCache.end(); it++) {
-            if ((it->second.GetSource() == relayedPkt.second.GetDestination())
-                    && (it->second.GetDestination() == relayedPkt.second.GetSource())
-                    && (it->second.GetSequence() == relayedPkt.second.GetSequence())) {
-
-                NS_LOG_INFO("ACK found in cache, RESEND!");
-                m_ackForwardQueue.push_front(*it);
-                m_resendAck = true;
-            }
-        }
-    }
-
-    bool
-    RescueMacCsma::IsNewSequence(Mac48Address addr, uint16_t seq) {
-        NS_LOG_FUNCTION(addr << seq);
-
-        RecvSeqList::iterator it = m_receivedFrames.find(addr);
-        if (it != m_receivedFrames.end()) {
-            //found source
-            if ((seq < 100) && (srcSeq(it).seq >= (65435))) //65535 - 100
-            {
-                //reuse seq. numbers
-                NS_LOG_INFO("resuse seq. numbers");
-                srcSeq(it).seq = seq;
-                return true;
-            } else if (seq > srcSeq(it).seq) {
-                //new seq. number
-                NS_LOG_INFO("new seq. number");
-                srcSeq(it).seq = seq;
-                return true;
-            } else {
-                //old seq. number (duplicate or reorder)
-                NS_LOG_INFO("old seq. number (duplicate or reorder)");
-                return false;
-            }
-        } else {
-            //new source
-
-            NS_LOG_INFO("new source");
-            m_receivedFrames.insert(std::pair<Mac48Address, uint16_t> (addr, seq));
-        }
-        return true;
-    }
-
     void
     RescueMacCsma::DoubleCw() {
+        NS_LOG_FUNCTION("");
         if (m_cw * 2 > m_cwMax) {
             m_cw = m_cwMax;
         } else {
@@ -1605,6 +1797,7 @@ namespace ns3 {
 
     Time
     RescueMacCsma::RoundOffTime(Time time) {
+        NS_LOG_FUNCTION("");
         int64_t realTime = time.GetMicroSeconds();
         int64_t slotTime = GetSlotTime().GetMicroSeconds();
         if (realTime % slotTime >= slotTime / 2) {

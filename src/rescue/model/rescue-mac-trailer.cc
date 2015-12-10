@@ -63,7 +63,7 @@ namespace ns3 {
 
     uint32_t
     RescueMacTrailer::Deserialize(Buffer::Iterator start) {
-        return GetSerializedSize();
+        return RESCUE_MAC_FCS_LENGTH;
     }
 
 } // namespace ns3

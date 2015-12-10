@@ -34,10 +34,10 @@
 #include "rescue-mac.h"
 #include "rescue-channel.h"
 #include "rescue-remote-station-manager.h"
+#include "rescue-arq-manager.h"
 
 
 NS_LOG_COMPONENT_DEFINE("RescueNetDevice");
-
 
 #undef NS_LOG_APPEND_CONTEXT
 #define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetSeconds() << "] [addr=" << ((m_mac != 0) ? compressMac(m_mac->GetAddress ()) : 0) << "] [NET DEV] "
@@ -57,9 +57,10 @@ namespace ns3 {
 
     void
     RescueNetDevice::Clear() {
+        NS_LOG_FUNCTION("");
         m_node = 0;
         if (m_mac) {
-            m_mac->Clear();
+            m_mac->Dispose();
             m_mac = 0;
         }
         if (m_phy) {
@@ -74,10 +75,15 @@ namespace ns3 {
             m_stationManager->Dispose();
             m_stationManager = 0;
         }
+        if (m_arqManager) {
+            m_arqManager->Dispose();
+            m_arqManager = 0;
+        }
     }
 
     void
     RescueNetDevice::DoDispose() {
+        NS_LOG_FUNCTION("");
         Clear();
         NetDevice::DoDispose();
     }
@@ -87,6 +93,7 @@ namespace ns3 {
         m_phy->Initialize();
         m_mac->Initialize();
         m_stationManager->Initialize();
+        m_arqManager->Initialize();
         NetDevice::DoInitialize();
     }
 
@@ -115,6 +122,11 @@ namespace ns3 {
                 MakePointerAccessor(&RescueNetDevice::SetRemoteStationManager,
                 &RescueNetDevice::GetRemoteStationManager),
                 MakePointerChecker<RescueRemoteStationManager> ())
+                .AddAttribute("ArqManager", "The station manager attached to this device.",
+                PointerValue(),
+                MakePointerAccessor(&RescueNetDevice::SetArqManager,
+                &RescueNetDevice::GetArqManager),
+                MakePointerChecker<RescueArqManager> ())
                 .AddTraceSource("Rx", "Received payload from the MAC layer.",
                 MakeTraceSourceAccessor(&RescueNetDevice::m_rxLogger))
                 .AddTraceSource("Tx", "Send payload to the MAC layer.",
@@ -151,39 +163,14 @@ namespace ns3 {
                 m_stationManager->SetupMac(m_mac);
                 NS_LOG_DEBUG("HI-MAC conected to Station Manager");
             }
+            if (m_arqManager != 0) {
+                m_mac->SetArqManager(m_arqManager);
+                m_arqManager->SetupMac(m_mac);
+                NS_LOG_DEBUG("HI-MAC conected to Arq Manager");
+            }
             m_mac->SetForwardUpCb(MakeCallback(&RescueNetDevice::ForwardUp, this));
         }
     }
-
-    /*void
-    RescueNetDevice::SetLowMac (Ptr<RescueMac> lowMac)
-    {
-      if (mac != 0)
-        {
-          m_lowMac = lowMac;
-          NS_LOG_DEBUG ("Set MAC");
-
-          if (m_phy != 0)
-            {
-              m_phy->SetMac (m_lowMac);
-              m_lowMac->AttachPhy (m_phy);
-              m_lowMac->SetDevice (this);
-              NS_LOG_DEBUG ("Attached MAC to PHY");
-            }
-          if (m_mac != 0)
-            {
-              m_mc->SetlowMac (m_lowMac);
-              m_lowMac->SetMac (m_mac);
-              NS_LOG_DEBUG ("HI-MAC attached to lower MAC");
-            }
-          if (m_stationManager != 0)
-            {
-              m_lowMac->SetRemoteStationManager (m_stationManager);
-              NS_LOG_DEBUG ("MAC conected to Station Manager");
-            }
-          //m_lowMac->SetForwardUpCb (MakeCallback (&RescueNetDevice::ForwardUp, this));
-        }
-    }*/
 
     void
     RescueNetDevice::SetPhy(Ptr<RescuePhy> phy) {
@@ -239,6 +226,19 @@ namespace ns3 {
     }
 
     void
+    RescueNetDevice::SetArqManager(Ptr<RescueArqManager> arqManager) {
+        if (arqManager != 0) {
+            m_arqManager = arqManager;
+            NS_LOG_DEBUG("Set ARQ MANAGER");
+            if (m_mac != 0) {
+                m_mac->SetArqManager(m_arqManager);
+                m_arqManager->SetupMac(m_mac);
+                NS_LOG_DEBUG("HI-MAC conected to Arq Manager");
+            }
+        }
+    }
+
+    void
     RescueNetDevice::SetIfIndex(uint32_t index) {
         m_ifIndex = index;
     }
@@ -275,12 +275,6 @@ namespace ns3 {
         return m_mac;
     }
 
-    /*Ptr<LowRescueMac>
-    RescueNetDevice::GetLowMac () const
-    {
-      return m_lowMac;
-    }*/
-
     Ptr<RescuePhy>
     RescueNetDevice::GetPhy() const {
         return m_phy;
@@ -299,6 +293,11 @@ namespace ns3 {
     Ptr<RescueRemoteStationManager>
     RescueNetDevice::GetRemoteStationManager(void) const {
         return m_stationManager;
+    }
+
+    Ptr<RescueArqManager>
+    RescueNetDevice::GetArqManager(void) const {
+        return m_arqManager;
     }
 
     Address
@@ -419,7 +418,6 @@ namespace ns3 {
 
     void
     RescueNetDevice::SetReceiveCallback(NetDevice::ReceiveCallback cb) {
-        NS_LOG_FUNCTION(this << &cb);
         m_forwardUp = cb;
     }
 

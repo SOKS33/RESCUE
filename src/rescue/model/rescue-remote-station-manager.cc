@@ -1,7 +1,6 @@
 /* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2005,2006,2007 INRIA
- * Copyright (c) 2015 AGH University of Science nad Technology
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,11 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Author: Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- *
- * Adapted for Rescue by: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  */
 
-#include "rescue-remote-station-manager.h"
 #include "ns3/simulator.h"
 #include "ns3/assert.h"
 #include "ns3/log.h"
@@ -30,12 +26,16 @@
 #include "ns3/double.h"
 #include "ns3/uinteger.h"
 #include "ns3/trace-source-accessor.h"
+
+#include "rescue-remote-station-manager.h"
 #include "rescue-phy.h"
 #include "rescue-mac.h"
 #include "rescue-mac-header.h"
 
 NS_LOG_COMPONENT_DEFINE("RescueRemoteStationManager");
 
+#undef NS_LOG_APPEND_CONTEXT
+#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now() << "] [addr=" << GetAddress () << "] [REMOTE STA MANAGER] "
 
 /***************************************************************
  *           Packet Mode Tagger
@@ -130,9 +130,6 @@ namespace ns3 {
 
 } // namespace ns3
 
-#undef NS_LOG_APPEND_CONTEXT
-#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetSeconds() << "] [addr=" << ((m_mac != 0) ? compressMac(m_mac->GetAddress ()) : 0) << "] [REM STA] "
-
 namespace ns3 {
 
     NS_OBJECT_ENSURE_REGISTERED(RescueRemoteStationManager);
@@ -149,21 +146,21 @@ namespace ns3 {
                 BooleanValue(true), // this value is ignored because there is no setter
                 MakeBooleanAccessor(&RescueRemoteStationManager::IsLowLatency),
                 MakeBooleanChecker())
-                .AddAttribute("MaxSrc", "The maximum number of retransmission attempts for a DATA packet. This value"
-                " will not have any effect on some rate control algorithms.",
-                UintegerValue(7),
-                MakeUintegerAccessor(&RescueRemoteStationManager::m_maxSrc),
-                MakeUintegerChecker<uint32_t> ())
+                /*.AddAttribute ("MaxSrc", "The maximum number of retransmission attempts for a DATA packet. This value"
+                               " will not have any effect on some rate control algorithms.",
+                               UintegerValue (7),
+                               MakeUintegerAccessor (&RescueRemoteStationManager::m_maxSrc),
+                               MakeUintegerChecker<uint32_t> ())*/
                 .AddAttribute("NonUnicastMode", "Rescue mode used for non-unicast transmissions.",
                 RescueModeValue(),
                 MakeRescueModeAccessor(&RescueRemoteStationManager::m_nonUnicastMode),
                 MakeRescueModeChecker())
-                .AddTraceSource("MacTxDataFailed",
-                "The transmission of a data packet by the MAC layer has failed",
-                MakeTraceSourceAccessor(&RescueRemoteStationManager::m_macTxDataFailed))
-                .AddTraceSource("MacTxFinalDataFailed",
-                "The transmission of a data packet has exceeded the maximum number of attempts",
-                MakeTraceSourceAccessor(&RescueRemoteStationManager::m_macTxFinalDataFailed))
+                /*.AddTraceSource ("MacTxDataFailed",
+                                 "The transmission of a data packet by the MAC layer has failed",
+                                 MakeTraceSourceAccessor (&RescueRemoteStationManager::m_macTxDataFailed))
+                .AddTraceSource ("MacTxFinalDataFailed",
+                                 "The transmission of a data packet has exceeded the maximum number of attempts",
+                                 MakeTraceSourceAccessor (&RescueRemoteStationManager::m_macTxFinalDataFailed))*/
                 ;
         return tid;
     }
@@ -176,6 +173,7 @@ namespace ns3 {
 
     void
     RescueRemoteStationManager::DoDispose(void) {
+        NS_LOG_FUNCTION("");
         for (StationStates::const_iterator i = m_states.begin(); i != m_states.end(); i++) {
             delete (*i);
         }
@@ -223,19 +221,22 @@ namespace ns3 {
         return m_cwMax;
     }
 
-    uint32_t
-    RescueRemoteStationManager::GetMaxSrc(void) const {
-        return m_maxSrc;
+    /*uint32_t
+    RescueRemoteStationManager::GetMaxSrc (void) const
+    {
+      return m_maxSrc;
     }
-
     void
-    RescueRemoteStationManager::SetMaxSrc(uint32_t maxSrc) {
-        m_maxSrc = maxSrc;
-    }
+    RescueRemoteStationManager::SetMaxSrc (uint32_t maxSrc)
+    {
+      m_maxSrc = maxSrc;
+    }*/
 
     Mac48Address
     RescueRemoteStationManager::GetAddress() const {
-        return m_mac->GetAddress();
+        if (m_mac != 0)
+            return m_mac->GetAddress();
+        else return Mac48Address("00:00:00:00:00:00");
     }
 
     void
@@ -325,7 +326,7 @@ namespace ns3 {
     RescueMode
     RescueRemoteStationManager::GetDataTxMode(Mac48Address address, Ptr<const Packet> packet, uint32_t fullPacketSize) {
         if (address.IsGroup()) {
-            NS_LOG_DEBUG("Group adress " << address);
+            NS_LOG_DEBUG("Group adress");
             return GetNonUnicastMode();
         }
         if (!IsLowLatency()) {
@@ -344,7 +345,7 @@ namespace ns3 {
     uint32_t
     RescueRemoteStationManager::GetDataCw(Mac48Address address, Ptr<const Packet> packet, uint32_t fullPacketSize) {
         if (address.IsGroup()) {
-            NS_LOG_DEBUG("Group adress " << address);
+            NS_LOG_DEBUG("Group adress");
             return GetNonUnicastCw();
         }
         if (!IsLowLatency()) {
@@ -364,17 +365,17 @@ namespace ns3 {
     RescueRemoteStationManager::ReportDataFailed(Mac48Address address) {
         NS_ASSERT(!address.IsGroup());
         RescueRemoteStation *station = Lookup(address);
-        station->m_src++;
-        m_macTxDataFailed(address);
+        //station->m_src++;
+        //m_macTxDataFailed (address);
         DoReportDataFailed(station);
     }
 
     void
-    RescueRemoteStationManager::ReportDataOk(Mac48Address address, double ackSnr, RescueMode ackMode, double dataSnr, double dataPer) {
+    RescueRemoteStationManager::ReportDataOk(Mac48Address address, double ackSnr, RescueMode ackMode, double dataSnr, double dataPer, uint32_t retryCounter) {
         NS_ASSERT(!address.IsGroup());
         RescueRemoteStation *station = Lookup(address);
-        station->m_state->m_info.NotifyTxSuccess(station->m_src);
-        station->m_src = 0;
+        station->m_state->m_info.NotifyTxSuccess(retryCounter);
+        //station->m_src = 0;
         DoReportDataOk(station, ackSnr, ackMode, dataSnr, dataPer);
     }
 
@@ -383,8 +384,8 @@ namespace ns3 {
         NS_ASSERT(!address.IsGroup());
         RescueRemoteStation *station = Lookup(address);
         station->m_state->m_info.NotifyTxFailed();
-        station->m_src = 0;
-        m_macTxFinalDataFailed(address);
+        //station->m_src = 0;
+        //m_macTxFinalDataFailed (address);
         DoReportFinalDataFailed(station);
     }
 
@@ -414,13 +415,14 @@ namespace ns3 {
                 rxSnr, txMode, wasReconstructed);
     }
 
-    bool
-    RescueRemoteStationManager::NeedDataRetransmission(Mac48Address address, Ptr<const Packet> packet) {
-        NS_ASSERT(!address.IsGroup());
-        RescueRemoteStation *station = Lookup(address);
-        bool normally = station->m_src < GetMaxSrc();
-        return DoNeedDataRetransmission(station, packet, normally);
-    }
+    /*bool
+    RescueRemoteStationManager::NeedDataRetransmission (Mac48Address address, Ptr<const Packet> packet)
+    {
+      NS_ASSERT (!address.IsGroup ());
+      RescueRemoteStation *station = Lookup (address);
+      bool normally = station->m_src < GetMaxSrc ();
+      return DoNeedDataRetransmission (station, packet, normally);
+    }*/
 
     RescueMode
     RescueRemoteStationManager::GetControlAnswerMode(Mac48Address address, RescueMode reqMode) {
@@ -557,13 +559,19 @@ namespace ns3 {
     uint32_t
     RescueRemoteStationManager::GetAckCw(Mac48Address address) {
         NS_ASSERT(!address.IsGroup());
-        return GetControlCw(address);
+        return DoGetAckCw(Lookup(address));
     }
 
     RescueMode
     RescueRemoteStationManager::GetCtrlTxMode(Mac48Address address) {
         //NS_ASSERT (!address.IsGroup ());
         return GetControlAnswerMode(address);
+    }
+
+    RescueMode
+    RescueRemoteStationManager::GetCtrlTxMode() {
+        //NS_ASSERT (!address.IsGroup ());
+        return DoGetCtrlTxMode();
     }
 
     uint32_t
@@ -604,7 +612,7 @@ namespace ns3 {
 
         RescueRemoteStation *station = DoCreateStation();
         station->m_state = state;
-        station->m_src = 0;
+        //station->m_src = 0;
         // XXX
         const_cast<RescueRemoteStationManager *> (this)->m_stations.push_back(station);
         return station;
@@ -642,7 +650,6 @@ namespace ns3 {
 
     RescueMode
     RescueRemoteStationManager::GetBasicMode(uint32_t i) const {
-        NS_LOG_UNCOND(" i=" << i << " bsssize=" << m_bssBasicRateSet.size());
         NS_ASSERT(i < m_bssBasicRateSet.size());
         return m_bssBasicRateSet[i];
     }
@@ -665,11 +672,12 @@ namespace ns3 {
         }
     }
 
-    bool
-    RescueRemoteStationManager::DoNeedDataRetransmission(RescueRemoteStation *station,
-            Ptr<const Packet> packet, bool normally) {
-        return normally;
-    }
+    /*bool
+    RescueRemoteStationManager::DoNeedDataRetransmission (RescueRemoteStation *station,
+                                                        Ptr<const Packet> packet, bool normally)
+    {
+      return normally;
+    }*/
 
     RescueMode
     RescueRemoteStationManager::GetSupported(const RescueRemoteStation *station, uint32_t i) const {
@@ -677,16 +685,18 @@ namespace ns3 {
         return station->m_state->m_operationalRateSet[i];
     }
 
-    uint32_t
-    RescueRemoteStationManager::GetRetryCount(const RescueRemoteStation *station) const {
-        return station->m_src;
+    /*uint32_t
+    RescueRemoteStationManager::GetRetryCount (const RescueRemoteStation *station) const
+    {
+      return station->m_src;
     }
 
     uint32_t
-    RescueRemoteStationManager::GetRetryCount(const Mac48Address address) const {
-        RescueRemoteStation *station = Lookup(address);
-        return station->m_src;
-    }
+    RescueRemoteStationManager::GetRetryCount (const Mac48Address address) const
+    {
+      RescueRemoteStation *station = Lookup (address);
+      return station->m_src;
+    }*/
 
     uint32_t
     RescueRemoteStationManager::GetNSupported(const RescueRemoteStation *station) const {

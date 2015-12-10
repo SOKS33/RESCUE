@@ -17,9 +17,7 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on ns-3 wifi module by:
- * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
 #include "ns3/address-utils.h"
@@ -39,7 +37,8 @@ namespace ns3 {
     : Header(),
     m_type(type),
     m_srcAddr(srcAddr),
-    m_dstAddr(dstAddr) {
+    m_dstAddr(dstAddr),
+    m_sequence(0) {
     }
 
     TypeId

@@ -35,8 +35,6 @@
 #include "rescue-phy-header.h"
 #include "rescue-mode.h"
 
-
-
 namespace ns3 {
 
     uint8_t compressMac(ns3::Mac48Address addr);
@@ -48,12 +46,20 @@ namespace ns3 {
     class RescueMacCsma;
     class RescueMacTdma;
     class RescueRemoteStationManager;
+    class RescueArqManager;
     class RescueNetDevice;
 
     enum StationType {
         STA,
         AP,
         ADHOC_STA
+    };
+
+    enum RelayBehavior {
+        FORWARD,
+        REPLACE_COPY,
+        RESEND_ACK,
+        DROP
     };
 
     /**
@@ -83,6 +89,10 @@ namespace ns3 {
          * \param manager RescueRemoteStationManager associated with this MAC
          */
         void SetRemoteStationManager(Ptr<RescueRemoteStationManager> manager);
+        /**
+         * \param arqManager RescueArqManager associated with this MAC
+         */
+        void SetArqManager(Ptr<RescueArqManager> arqManager);
         /**
          * Assign a fixed random variable stream number to the random variables
          * used by this model.  Return the number of streams (possibly zero) that
@@ -135,7 +145,7 @@ namespace ns3 {
         /**
          * \param duration the Basic ACK Timeout duration
          */
-        void SetBasicAckTimeout(Time duration);
+        //void SetBasicAckTimeout (Time duration);
 
         /**
          * \return the current address of this MAC layer.
@@ -181,7 +191,7 @@ namespace ns3 {
         /**
          * \return duration the Basic ACK Timeout duration
          */
-        Time GetBasicAckTimeout(void) const;
+        //Time GetBasicAckTimeout (void) const;
 
         /**
          * \param pkt the packet to send.
@@ -192,6 +202,26 @@ namespace ns3 {
          * access is granted to this MAC.
          */
         virtual void Enqueue(Ptr<Packet> pkt, Mac48Address dest);
+
+        /**
+         * \param pkt the packet to send.
+         * \param dest the address to which the packet should be sent.
+         *
+         * Should be used to enqueue retransmitted packets by ARQ manager
+         */
+        virtual void EnqueueRetry(Ptr<Packet> pkt, Mac48Address dest);
+
+        //virtual void NotifyEnqueueRelay (Ptr<Packet> pkt, Mac48Address dest);
+
+        virtual void NotifyEnqueuedPacket(Ptr<Packet> pkt, Mac48Address dest);
+
+        /**
+         * \param pkt the packet to send.
+         * \param phyHdr the header to send.
+         *
+         * Should be used to enqueue ACK/NACK packets by ARQ manager
+         */
+        virtual void EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader ackHdr);
 
         /**
          * invoked to notify about successful DATA frame enqueing
@@ -242,6 +272,13 @@ namespace ns3 {
          */
         virtual bool ShouldBeForwarded(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
 
+        /**
+         * used by ARQ manager to notify about allowance for TX
+         */
+        virtual void NotifyTxAllowed(void);
+
+        virtual void NotifySendPacketDone(void);
+
     protected:
         virtual void DoInitialize();
         virtual void DoDispose();
@@ -252,7 +289,8 @@ namespace ns3 {
         Ptr<RescueMacCsma> m_csmaMac; //!< Pointer to RescueMacCsma
         Ptr<RescueMacTdma> m_tdmaMac; //!< Pointer to RescueMacTdma
         Ptr<RescueNetDevice> m_device; //!< Pointer to RescueNetDevice
-        Ptr<RescueRemoteStationManager> m_remoteStationManager; //!< Pointer to WifiRemoteStationManager (rate control)
+        Ptr<RescueRemoteStationManager> m_remoteStationManager; //!< Pointer to RescueRemoteStationManager (rate control)
+        Ptr<RescueArqManager> m_arqManager; //!< Pointer to RescueArqManager (rate control)
         Ptr<UniformRandomVariable> m_random; //!< Provides uniform random variables.
 
         Mac48Address m_address; //!< Address of this MAC

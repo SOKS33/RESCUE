@@ -18,7 +18,6 @@
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
  * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
- * and ns-3 wifi module by Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
  */
 
 #ifndef RESCUE_PHY_H
@@ -51,6 +50,9 @@ namespace ns3 {
      */
     class RescuePhy : public Object {
     public:
+
+        //MODIF 2
+        void NotifyMacDelay(Time);
 
         enum State {
             IDLE, TX, RX, COLL
@@ -178,7 +180,7 @@ namespace ns3 {
          * \return the total amount of time this PHY will stay busy for
          *          the transmission of these bytes.
          */
-        Time CalTxDuration(uint32_t basicSize, uint32_t dataSize, RescueMode basicMode, RescueMode dataMode, uint16_t type);
+        Time CalTxDuration(uint32_t basicSize, uint32_t dataSize, RescueMode basicMode, RescueMode dataMode, uint16_t type, bool centralised);
         /**
          * Used for TX time calculation when PhyHdr is alreade constructed
          *
@@ -301,14 +303,14 @@ namespace ns3 {
          * \param mode the PHY TX mode of received frame
          * \return true if previous copies of the frame were found
          */
-        bool AddFrameCopy(Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, double per, double ber, RescueMode mode);
+        bool AddFrameCopy(Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, /*double per,*/ double ber, RescueMode mode);
         /**
          * Checks if frame was succesfully restored from stored copies.
          *
          * \param phyHdr PHY header associated with frame to check
          * \return true if frame was succesfully restored
          */
-        bool IsRestored(RescuePhyHeader phyHdr, bool useBB2);
+        bool IsRestored(RescuePhyHeader phyHdr);
 
 
         Ptr<RescueNetDevice> m_device; //!< Pointer to RescueNetDevice
@@ -329,12 +331,13 @@ namespace ns3 {
         RescueModeList m_deviceRateSet; //!< List of supported TX/RX modes (RescueMode)
 
         double m_berThr; //!< PER threshold - frames with higher PER are unusable for reconstruction purposes and should not be stored or forwarded
-        bool m_useBB2; //!< Use BlackBox #2 for error calculation? (if it is possible)
         bool m_useLOTF; //!< Use Rescue links-on-the-fly
 
         State m_state; //!< Current state of this PHY
         bool m_csBusy; //!< Busy channel indicator (true = channel busy)
         Time m_csBusyEnd; //!< Expected time when channel become idle
+        bool m_rxBusy; //!< Busy channel indicator (true = channel busy)
+        Time m_rxBusyEnd; //!< Expected time when channel become idle
 
         Ptr<Packet> m_pktRx; //!< Currently received packet
 
@@ -365,22 +368,16 @@ namespace ns3 {
             RxFrameCopies(RescuePhyHeader phyHdr,
                     Ptr<Packet> pkt,
                     std::vector<double> snr_db,
-                    std::vector<double> linkPER,
                     std::vector<double> linkBER,
-                    //int constellationSize,
                     std::vector<int> constellationSizes,
-                    //double spectralEfficiency,
                     std::vector<double> spectralEfficiencies,
                     int packetLength,
                     Time tstamp);
             RescuePhyHeader phyHdr;
             Ptr<Packet> pkt;
             std::vector<double> snr_db;
-            std::vector<double> linkPER;
             std::vector<double> linkBER;
-            //int constellationSize;
             std::vector<int> constellationSizes;
-            //double spectralEfficiency;
             std::vector<double> spectralEfficiencies;
             int packetLength;
             Time tstamp;
@@ -391,6 +388,7 @@ namespace ns3 {
     protected:
         TracedCallback<Ptr<const Packet>> m_traceSend; //<! Trace Hookup for enqueue a DATA
         TracedCallback<Ptr<const Packet>, double> m_traceRecv; //<! Trace Hookup for DATA RX (by final station)
+        TracedCallback<double> m_updateSNR;
 
     };
 

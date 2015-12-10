@@ -1,6 +1,6 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
- * Copyright (c) 2015 AGH University of Science and Technology
+ * Copyright (c) 2010 University of Arizona
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -16,6 +16,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
+ *
+ * basing on Simple CSMA/CA Protocol module Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
 /* Node 0 periodically transmits UDP packet to Node 1
@@ -194,14 +196,13 @@ int main(int argc, char *argv[]) {
     double TxPower = 20;
     double BerThr = 0.2;
     bool useLOTF = true;
-    bool useBB2 = false;
 
     uint32_t cwMin = 16;
     uint32_t cwMax = 1024;
     double slotTime = 15;
     double sifsTime = 30;
     double lifsTime = 60;
-    uint32_t queueLimit = 20;
+    uint32_t queueLimit = 100;
     uint16_t retryLimit = 2;
     double ackTimeout = 3500;
 
@@ -250,7 +251,6 @@ int main(int argc, char *argv[]) {
     cmd.AddValue("TxPower", "Transmission Power [dBm]", TxPower);
     cmd.AddValue("BerThr", "BER threshold - frames with higher BER are unusable for reconstruction purposes and should not be stored or forwarded (default value = 0.5)", BerThr);
     cmd.AddValue("useLOTF", "Use Links-on-the-Fly", useLOTF);
-    cmd.AddValue("useBB2", "Use BlackBox #2 for error calculations", useBB2);
 
     cmd.AddValue("cwMin", "Minimum value of CW", cwMin);
     cmd.AddValue("cwMax", "Maximum value of CW", cwMax);
@@ -331,8 +331,7 @@ int main(int argc, char *argv[]) {
             "RxPowerThr", DoubleValue(RxPowerThr),
             "TxPower", DoubleValue(TxPower),
             "BerThr", DoubleValue(BerThr),
-            "UseLOTF", BooleanValue(useLOTF),
-            "UseBB2", BooleanValue(useBB2));
+            "UseLOTF", BooleanValue(useLOTF));
 
     AdhocRescueMacHelper rescueMac = AdhocRescueMacHelper::Default();
     rescueMac.SetType("ns3::AdhocRescueMac",
@@ -341,14 +340,15 @@ int main(int argc, char *argv[]) {
             "SlotTime", TimeValue(MicroSeconds(slotTime)),
             "SifsTime", TimeValue(MicroSeconds(sifsTime)),
             "LifsTime", TimeValue(MicroSeconds(lifsTime)),
-            "QueueLimits", UintegerValue(queueLimit),
-            "BasicAckTimeout", TimeValue(MicroSeconds(ackTimeout)));
+            "QueueLimits", UintegerValue(queueLimit));
 
     RescueHelper rescue;
     rescue.SetRemoteStationManager("ns3::ConstantRateRescueManager",
             "DataMode", StringValue(SimulationHelper::MapPhyRateToString(dataPhyRate)),
-            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)),
-            "MaxSrc", UintegerValue(++retryLimit));
+            "ControlMode", StringValue(SimulationHelper::MapPhyRateToString(basicPhyRate)));
+    rescue.SetArqManager("ns3::RescueArqManager",
+            "BasicAckTimeout", TimeValue(MicroSeconds(ackTimeout)),
+            "MaxRetryCount", UintegerValue(++retryLimit));
     NetDeviceContainer devices = rescue.Install(nodes, rescueChan, rescuePhy, rescueMac);
 
 
@@ -481,8 +481,8 @@ int main(int argc, char *argv[]) {
     std::cout << dSD << "\t"
             << 8 * (double) m_received_bytes / (double) (simTime - calcStart) / 1000000 << "\t"
             << ((m_send > m_received) ? (100 * ((double) m_send - (double) m_received) / (double) m_send) : 0) << "\t"
-            << (double) (m_delaySum / m_received).GetMicroSeconds() / 1000 << "\t"
-            << (double) (m_jitterSum / m_received).GetMicroSeconds() / 1000 << std::endl;
+            << ((m_received > 0) ? ((double) (m_delaySum / m_received).GetMicroSeconds() / 1000) : 0.0) << "\t"
+            << ((m_received > 0) ? ((double) (m_jitterSum / m_received).GetMicroSeconds() / 1000) : 0.0) << std::endl;
 
     return 0;
 }

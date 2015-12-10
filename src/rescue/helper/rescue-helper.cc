@@ -1,10 +1,9 @@
 /* -*-  Mode: C++; c-file-style: "gnu"; indent-tabs-mode:nil; -*- */
 /*
  * Copyright (c) 2010 University of Arizona
- * Copyright (c) 2015 AGH University of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
+ * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
  *
  * This program is distributed in the hope that it will be useful,
@@ -32,6 +31,7 @@
 #include "ns3/rescue-phy.h"
 #include "ns3/rescue-channel.h"
 #include "ns3/rescue-remote-station-manager.h"
+#include "ns3/rescue-arq-manager.h"
 #include "rescue-helper.h"
 
 #include <sstream>
@@ -39,109 +39,129 @@
 
 NS_LOG_COMPONENT_DEFINE("RescueHelper");
 
-namespace ns3
-{
-  
-RescueMacHelper::~RescueMacHelper ()
-{}
+namespace ns3 {
 
-RescuePhyHelper::~RescuePhyHelper ()
-{}
-
-RescueHelper::RescueHelper ()
-{
-  //m_mac.SetTypeId ("ns3::RescueMacCsma");
-  m_mac.SetTypeId ("ns3::AdhocRescueMac");
-  m_phy.SetTypeId ("ns3::RescuePhy");
-  //m_stationManager.SetTypeId ("ns3::RescueRemoteStationManager");
-}
-
-RescueHelper::~RescueHelper ()
-{}
-
-RescueHelper
-RescueHelper::Default (void)
-{
-  RescueHelper helper;
-  helper.SetRemoteStationManager ("ns3::ConstantRateRescueManager",
-							      "DataMode", StringValue ("Ofdm36Mbps"),
-							      "ControlMode", StringValue ("Ofdm6Mbps"),
-								  "MaxSrc", UintegerValue (7));
-  return helper;
-}
-
-void
-RescueHelper::SetRemoteStationManager (std::string type,
-                                       std::string n0, const AttributeValue &v0,
-                                       std::string n1, const AttributeValue &v1,
-                                       std::string n2, const AttributeValue &v2,
-                                       std::string n3, const AttributeValue &v3,
-                                       std::string n4, const AttributeValue &v4,
-                                       std::string n5, const AttributeValue &v5,
-                                       std::string n6, const AttributeValue &v6,
-                                       std::string n7, const AttributeValue &v7)
-{
-  m_stationManager = ObjectFactory ();
-  m_stationManager.SetTypeId (type);
-  m_stationManager.Set (n0, v0);
-  m_stationManager.Set (n1, v1);
-  m_stationManager.Set (n2, v2);
-  m_stationManager.Set (n3, v3);
-  m_stationManager.Set (n4, v4);
-  m_stationManager.Set (n5, v5);
-  m_stationManager.Set (n6, v6);
-  m_stationManager.Set (n7, v7);
-}
-
-NetDeviceContainer
-RescueHelper::Install (NodeContainer c, Ptr<RescueChannel> channel, const RescuePhyHelper &phyHelper, const RescueMacHelper &macHelper) const
-{
-  NS_LOG_FUNCTION ("");
-  NetDeviceContainer devices;
-  for (NodeContainer::Iterator i = c.Begin (); i != c.End (); i++)
-    {
-      Ptr<Node> node = *i;
-      Ptr<RescueNetDevice> device = CreateObject<RescueNetDevice> ();
-      Ptr<RescueRemoteStationManager> manager = m_stationManager.Create<RescueRemoteStationManager> ();
-
-      Ptr<RescueMac> mac = macHelper.Create ();
-      Ptr<RescuePhy> phy = phyHelper.Create ();
-      mac->SetAddress (Mac48Address::Allocate ());
-      device->SetMac (mac);
-      device->SetPhy (phy);
-      device->SetChannel (channel);
-      device->SetRemoteStationManager (manager);
-
-      node->AddDevice (device);
-      devices.Add (device);
-
-      NS_LOG_DEBUG ("node="<<node<<", mob="<<node->GetObject<MobilityModel> ());
-  }
-  return devices;
-}
-
-int64_t
-RescueHelper::AssignStreams (NetDeviceContainer c, int64_t stream)
-{
-  int64_t currentStream = stream;
-  Ptr<NetDevice> netDevice;
-  for (NetDeviceContainer::Iterator i = c.Begin (); i != c.End (); ++i)
-    {
-      netDevice = (*i);
-      Ptr<RescueNetDevice> rescue = DynamicCast<RescueNetDevice> (netDevice);
-      if (rescue)
-        {
-          // Handle any random numbers in the PHY objects.
-          currentStream += rescue->GetPhy ()->AssignStreams (currentStream);
-
-          // Handle any random numbers in the station managers. /currently not needed/
-          //Ptr<RescueRemoteStationManager> manager = rescue->GetRemoteStationManager ();
-
-          // Handle any random numbers in the MAC objects. /currently not needed/
-          currentStream += rescue->GetMac ()->AssignStreams (currentStream);
-        }
+    RescueMacHelper::~RescueMacHelper() {
     }
-  return (currentStream - stream);
-}
+
+    RescuePhyHelper::~RescuePhyHelper() {
+    }
+
+    RescueHelper::RescueHelper() {
+        //m_mac.SetTypeId ("ns3::RescueMacCsma");
+        m_mac.SetTypeId("ns3::AdhocRescueMac");
+        m_phy.SetTypeId("ns3::RescuePhy");
+        //m_stationManager.SetTypeId ("ns3::RescueRemoteStationManager");
+    }
+
+    RescueHelper::~RescueHelper() {
+    }
+
+    RescueHelper
+    RescueHelper::Default(void) {
+        RescueHelper helper;
+        helper.SetRemoteStationManager("ns3::ConstantRateRescueManager",
+                "DataMode", StringValue("Ofdm36Mbps"),
+                "ControlMode", StringValue("Ofdm6Mbps"));
+        helper.SetArqManager("ns3::RescueArqManager",
+                "MaxRetryCount", UintegerValue(7));
+        return helper;
+    }
+
+    void
+    RescueHelper::SetRemoteStationManager(std::string type,
+            std::string n0, const AttributeValue &v0,
+            std::string n1, const AttributeValue &v1,
+            std::string n2, const AttributeValue &v2,
+            std::string n3, const AttributeValue &v3,
+            std::string n4, const AttributeValue &v4,
+            std::string n5, const AttributeValue &v5,
+            std::string n6, const AttributeValue &v6,
+            std::string n7, const AttributeValue &v7) {
+        m_stationManager = ObjectFactory();
+        m_stationManager.SetTypeId(type);
+        m_stationManager.Set(n0, v0);
+        m_stationManager.Set(n1, v1);
+        m_stationManager.Set(n2, v2);
+        m_stationManager.Set(n3, v3);
+        m_stationManager.Set(n4, v4);
+        m_stationManager.Set(n5, v5);
+        m_stationManager.Set(n6, v6);
+        m_stationManager.Set(n7, v7);
+    }
+
+    void
+    RescueHelper::SetArqManager(std::string type,
+            std::string n0, const AttributeValue &v0,
+            std::string n1, const AttributeValue &v1,
+            std::string n2, const AttributeValue &v2,
+            std::string n3, const AttributeValue &v3,
+            std::string n4, const AttributeValue &v4,
+            std::string n5, const AttributeValue &v5,
+            std::string n6, const AttributeValue &v6,
+            std::string n7, const AttributeValue &v7,
+            std::string n8, const AttributeValue &v8,
+            std::string n9, const AttributeValue &v9) {
+        m_arqManager = ObjectFactory();
+        m_arqManager.SetTypeId(type);
+        m_arqManager.Set(n0, v0);
+        m_arqManager.Set(n1, v1);
+        m_arqManager.Set(n2, v2);
+        m_arqManager.Set(n3, v3);
+        m_arqManager.Set(n4, v4);
+        m_arqManager.Set(n5, v5);
+        m_arqManager.Set(n6, v6);
+        m_arqManager.Set(n7, v7);
+        m_arqManager.Set(n8, v8);
+        m_arqManager.Set(n9, v9);
+    }
+
+    NetDeviceContainer
+    RescueHelper::Install(NodeContainer c, Ptr<RescueChannel> channel, const RescuePhyHelper &phyHelper, const RescueMacHelper &macHelper) const {
+        NS_LOG_FUNCTION("");
+        NetDeviceContainer devices;
+        for (NodeContainer::Iterator i = c.Begin(); i != c.End(); i++) {
+            Ptr<Node> node = *i;
+            Ptr<RescueNetDevice> device = CreateObject<RescueNetDevice> ();
+            Ptr<RescueRemoteStationManager> manager = m_stationManager.Create<RescueRemoteStationManager> ();
+            Ptr<RescueArqManager> arq = m_arqManager.Create<RescueArqManager> ();
+
+            Ptr<RescueMac> mac = macHelper.Create();
+            Ptr<RescuePhy> phy = phyHelper.Create();
+            mac->SetAddress(Mac48Address::Allocate());
+            device->SetMac(mac);
+            device->SetPhy(phy);
+            device->SetChannel(channel);
+            device->SetRemoteStationManager(manager);
+            device->SetArqManager(arq);
+
+            node->AddDevice(device);
+            devices.Add(device);
+
+            NS_LOG_DEBUG("node=" << node << ", mob=" << node->GetObject<MobilityModel> ());
+        }
+        return devices;
+    }
+
+    int64_t
+    RescueHelper::AssignStreams(NetDeviceContainer c, int64_t stream) {
+        int64_t currentStream = stream;
+        Ptr<NetDevice> netDevice;
+        for (NetDeviceContainer::Iterator i = c.Begin(); i != c.End(); ++i) {
+            netDevice = (*i);
+            Ptr<RescueNetDevice> rescue = DynamicCast<RescueNetDevice> (netDevice);
+            if (rescue) {
+                // Handle any random numbers in the PHY objects.
+                currentStream += rescue->GetPhy()->AssignStreams(currentStream);
+
+                // Handle any random numbers in the station managers. /currently not needed/
+                //Ptr<RescueRemoteStationManager> manager = rescue->GetRemoteStationManager ();
+
+                // Handle any random numbers in the MAC objects. /currently not needed/
+                currentStream += rescue->GetMac()->AssignStreams(currentStream);
+            }
+        }
+        return (currentStream - stream);
+    }
 
 } //end namespace ns3

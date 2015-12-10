@@ -51,6 +51,11 @@ namespace ns3 {
      */
     class LowRescueMac : public Object {
     public:
+
+        //MODIF 2
+        virtual void SetTxDuration(Time txDuration) = 0;
+        virtual void SetChannelDelay(Time delay) = 0;
+
         /**
          * \param phy the physical layer to attach to this MAC.
          */

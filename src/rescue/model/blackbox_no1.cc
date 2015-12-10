@@ -3,7 +3,7 @@
 #include "ns3/log.h"
 #include "blackbox_no1.h"
 
-NS_LOG_COMPONENT_DEFINE("BlackBox_no1");
+NS_LOG_COMPONENT_DEFINE("BlackBox");
 
 namespace ns3 {
 
@@ -12,9 +12,8 @@ namespace ns3 {
     TypeId
     BlackBox_no1::GetTypeId(void) {
         static TypeId tid = TypeId("ns3::BlackBox_no1")
-                .SetParent<Object> ()
-                .AddConstructor<BlackBox_no1> ()
-                ;
+                .SetParent<Object>()
+                .AddConstructor<BlackBox_no1>();
         return tid;
     }
 
@@ -25,18 +24,10 @@ namespace ns3 {
     }
 
     void
-    BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, OutputBlackBox_no1 & outbl_no1) {
+    BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, OutputBlackbox_no1 & outbl_no1) {
         NS_ASSERT(snr_db.size() == linkBitER.size());
         NS_ASSERT(snr_db.size() == constellationSize.size());
         NS_ASSERT(snr_db.size() == spectralEfficiency.size());
-
-        NS_LOG_FUNCTION("");
-        for (std::vector<double>::iterator it = snr_db.begin(); it != snr_db.end(); ++it) {
-            NS_LOG_DEBUG("snr = " << *it);
-        }
-        for (std::vector<double>::iterator it = linkBitER.begin(); it != linkBitER.end(); ++it) {
-            NS_LOG_DEBUG("ber = " << *it);
-        }
 
         int num_links = snr_db.size(); // number of incoming links
 
@@ -45,13 +36,8 @@ namespace ns3 {
             esN0.push_back(std::pow(10, *it / 10)); // convert SNR to linear scale
         }
 
-        for (std::vector<double>::iterator it = esN0.begin(); it != esN0.end(); ++it) {
-            NS_LOG_DEBUG("esN0 = " << *it);
-        }
-
         std::vector<double> C;
         for (uint32_t i = 0; i < esN0.size(); ++i) {
-            NS_LOG_DEBUG("constellationSize = " << constellationSize[i]);
             // Determine constellation constrained capacity per complex symbol
             if (constellationSize[i] == 2) // BPSK
                 C.push_back(BlackBox_no1::J_Function(std::sqrt(8 * esN0[i])));
@@ -60,7 +46,7 @@ namespace ns3 {
             else if (constellationSize[i] == 16) // 16QAM
                 C.push_back(Four_Pam_Capacity_Table_Lookup(snr_db[i])); // the multiplication by 2 take place in the function
             else {
-                NS_LOG_DEBUG("Unsupported constellation size.");
+                std::cout << "Unsupported constellation size." << std::endl;
             }
         }
 
@@ -68,12 +54,7 @@ namespace ns3 {
         // Note that this can be >1
         std::vector<double> Phi;
         for (uint32_t i = 0; i < C.size(); ++i) {
-            NS_LOG_DEBUG("spectralEfficiency = " << spectralEfficiency[i]);
             Phi.push_back(C[i] / spectralEfficiency[i]);
-        }
-
-        for (std::vector<double>::iterator it = Phi.begin(); it != Phi.end(); ++it) {
-            NS_LOG_DEBUG("Phi = " << *it);
         }
 
         double H; // binary entropy function
@@ -91,30 +72,20 @@ namespace ns3 {
                 MI.push_back(Phi[i]); // if no errors in transmitter, allow MI increment > 1
         }
 
-        for (std::vector<double>::iterator it = MI.begin(); it != MI.end(); ++it) {
-            NS_LOG_DEBUG("MI = " << *it);
-        }
-
         double MI_tot = std::accumulate(MI.begin(), MI.end(), 0.0);
-
-        NS_LOG_DEBUG("MI_tot = " << MI_tot);
 
         // Determine expected bit error probability after joint decoding at the receiver
         double p_rateDistortion = BlackBox_no1::InvH(1 - std::min(MI_tot, 1.0));
         double p_floor = BlackBox_no1::ErrorFloor(linkBitER);
         double p_rx = std::max(p_rateDistortion, p_floor); // bit error rate
 
-        NS_LOG_DEBUG("p_rateDistortion = " << p_rateDistortion <<
-                ", p_floor = " << p_floor <<
-                ", p_rx = " << p_rx);
-
-        outbl_no1.ber = p_rx;
-        outbl_no1.mi = MI_tot;
-        outbl_no1.p_floor = p_floor;
+        outbl_no1.m_ber = p_rx;
+        outbl_no1.m_mi = MI_tot;
+        outbl_no1.m_p_floor = p_floor;
     }
 
     void
-    BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> linkSnr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency, OutputBlackBox_no1 & outbl_no1) {
+    BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> linkSnr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency, OutputBlackbox_no1 & outbl_no1) {
         NS_ASSERT(linkSnr_db.size() == linkBitER.size());
 
         std::vector<int> linkConstellationSize;
@@ -130,54 +101,10 @@ namespace ns3 {
 
     double
     BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency) {
-        NS_LOG_FUNCTION("");
+        OutputBlackbox_no1 outputBlackbox_no1;
+        BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBitER, constellationSize, spectralEfficiency, outputBlackbox_no1);
 
-        OutputBlackBox_no1 outputBlackBox_no1;
-        BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBitER, constellationSize, spectralEfficiency, outputBlackBox_no1);
-
-        return outputBlackBox_no1.ber;
-    }
-
-    double
-    BlackBox_no1::CalculateRescueBitErrorRate(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency) {
-        NS_LOG_FUNCTION("");
-
-        OutputBlackBox_no1 outputBlackBox_no1;
-        BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBitER, constellationSize, spectralEfficiency, outputBlackBox_no1);
-
-        return outputBlackBox_no1.ber;
-    }
-
-    double
-    BlackBox_no1::CalculateRescuePacketErrorRate(std::vector<double> snr_db, std::vector<double> linkPacketER, int constellationSize, double spectralEfficiency, int packetLength) {
-        std::vector<double> linkBitER = BlackBox_no1::PERtoBER(linkPacketER, packetLength); // convert PER in BER (packet length in bit)
-
-        OutputBlackBox_no1 outputBlackBox_no1;
-        BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBitER, constellationSize, spectralEfficiency, outputBlackBox_no1);
-
-        return BlackBox_no1::BERtoPER(outputBlackBox_no1.ber, packetLength);
-    }
-
-    double
-    BlackBox_no1::CalculateRescuePacketErrorRate(std::vector<double> snr_db, std::vector<double> linkPacketER, std::vector<int> constellationSize, std::vector<double> spectralEfficiency, int packetLength) {
-        //to bypass bug for QAM16 and SNR >= 25 dBm
-        if (snr_db[0] >= 25
-                && (snr_db.size() == 1)
-                && constellationSize[0] == 16) {
-            return linkPacketER[0];
-        }
-
-        NS_LOG_FUNCTION("Length: " << packetLength);
-        for (std::vector<double>::iterator it = linkPacketER.begin(); it != linkPacketER.end(); ++it) {
-            NS_LOG_DEBUG("per = " << *it);
-        }
-
-        std::vector<double> linkBitER = BlackBox_no1::PERtoBER(linkPacketER, packetLength); // convert PER in BER (packet length in bit)
-
-        OutputBlackBox_no1 outputBlackBox_no1;
-        BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBitER, constellationSize, spectralEfficiency, outputBlackBox_no1);
-
-        return BlackBox_no1::BERtoPER(outputBlackBox_no1.ber, packetLength);
+        return outputBlackbox_no1.m_ber;
     }
 
     double
@@ -193,11 +120,6 @@ namespace ns3 {
             x = -H1 * std::pow(sigma, 2 * H2);
             y = 1 - std::pow(2, x);
         }
-
-        NS_LOG_DEBUG("J-function: sigma: " << sigma <<
-                ", x: " << x <<
-                ", y: " << y <<
-                ", return: " << std::pow(y, H3));
 
         return std::pow(y, H3);
     }
@@ -310,26 +232,6 @@ namespace ns3 {
     }
 
     std::vector<double>
-    BlackBox_no1::PERtoBER(std::vector<double> linkPER, int packetLength) {
-        std::vector<double> BER;
-        for (std::vector<double>::iterator it = linkPER.begin(); it != linkPER.end(); ++it) {
-            BER.push_back(1 - std::pow(1.0 - *it, 1.0 / static_cast<double> (packetLength))); // convert PER to BER Pbit = 1 - (1 - Ppack)^(1/N)  N...packet length
-        }
-
-        return BER;
-    }
-
-    double
-    BlackBox_no1::PERtoBER(double per, int packetLength) {
-        return (1 - std::pow(1.0 - per, 1.0 / static_cast<double> (packetLength))); // convert PER to BER Pbit = 1 - (1 - Ppack)^(1/N)  N...packet length
-    }
-
-    double
-    BlackBox_no1::BERtoPER(double ber, int packetLength) {
-        return (1 - std::pow(1.0 - ber, packetLength)); // convert BER to PER Ppack = 1 - (1 - Pbit)^(N)  N...packet length
-    }
-
-    std::vector<double>
     BlackBox_no1::GenerateBitDivisor(int numberLinks) {
         std::vector<double> bitDivisor;
 
@@ -341,25 +243,18 @@ namespace ns3 {
     }
 
     double
-    BlackBox_no1::BinaryConvolution(double p1, double p2, int packetLength) {
-        double ber;
-        double ber1;
-        double ber2;
+    BlackBox_no1::BinaryConvolution(double ber1, double ber2) {
+        double ber(0);
 
-        if (p1 < 0 || p2 < 0 || p1 > 1 || p2 > 1) {
+        if (ber1 < 0 || ber2 < 0 || ber1 > 1 || ber2 > 1) {
             ber = -1;
-            NS_LOG_ERROR("Error probabilities are negative or greater than 1.");
-        } else if (packetLength > 1) {
-            ber1 = BlackBox_no1::PERtoBER(p1, packetLength);
-            ber2 = BlackBox_no1::PERtoBER(p2, packetLength);
-        } else {
-            ber1 = p1;
-            ber2 = p2;
+            NS_FATAL_ERROR("Error probabilities are negative or greater than 1.");
         }
 
         ber = ber1 * (1 - ber2) + (1 - ber1) * ber2;
 
-        return BlackBox_no1::BERtoPER(ber, packetLength);
+        return ber;
     }
 
 } // namespace ns3
+

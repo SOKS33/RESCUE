@@ -36,7 +36,7 @@
 NS_LOG_COMPONENT_DEFINE("RescueChannel");
 
 #undef NS_LOG_APPEND_CONTEXT
-#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetSeconds() << "] [CHA] "
+#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetMicroSeconds() << "] [CHA] "
 
 namespace ns3 {
 
@@ -144,6 +144,9 @@ namespace ns3 {
                 ne.txEnd = Simulator::Now() + txDuration + delay;
                 ne.procDelay = NanoSeconds(0);
 
+                //MODIF 2
+                phy->NotifyMacDelay(delay);
+
                 //Simulator::ScheduleWithContext (dstNodeId, delay - m_addNoiseEntryEarlier, &RescueChannel::AddNoiseEntry, this, j, ne);
                 Simulator::ScheduleWithContext(dstNodeId, delay, &RescueChannel::AddNoiseEntry, this, j, ne);
                 //Simulator::ScheduleWithContext (dstNodeId, delay, &RescueChannel::ReceivePacket, this, j, ne);
@@ -169,7 +172,7 @@ namespace ns3 {
         Time maxTxStart;
         Time minTxStart;
         Time preambleSimbolDuration = NanoSeconds(1000000000 / ne.phy->GetPhyPreambleMode(ne.mode).GetDataRate() + 1);
-        Time delay = preambleSimbolDuration;
+        Time delay = 2 * preambleSimbolDuration;
 
         //check stronger noise entries starting within the first premble simbol period
         //or weaker transmissions that has started earlier but the first preamble simbol is not ended
@@ -202,12 +205,12 @@ namespace ns3 {
         NS_LOG_DEBUG("found: maxTxPower: " << maxRxPower << ", start: " << maxTxStart << ", minTxPower: " << minRxPower << ", start: " << minTxStart);
         if (maxRxPower > ne.rxPower) {
             //delay this transmission processing after the found noise entry starts
-            NS_LOG_DEBUG("STRONGER RX: start: " << maxTxStart);
             delay = maxTxStart - Simulator::Now() + NanoSeconds(1);
+            NS_LOG_DEBUG("STRONGER RX: start: " << maxTxStart << ", delay: " << delay);
         } else if (minRxPower < ne.rxPower) {
             //start this transmission processing before processing of the found noise entry starts
-            NS_LOG_DEBUG("WEAKER RX: start: " << minTxStart);
             delay = minTxStart - Simulator::Now() - NanoSeconds(1);
+            NS_LOG_DEBUG("WEAKER RX: start: " << minTxStart << ", delay: " << delay);
         }
 
         ne.procDelay = delay;

@@ -28,6 +28,24 @@
 
  umask 022
 
+ function createButton {
+      if [ $#  -ne 2 ] ; then
+          echo "createButton string absolute_path_to_html_file"
+          exit -23
+      fi
+      name=$1
+      nameup=$(echo $name | awk '{print toupper($0)}')
+      file=$2
+      if [ ! -f $file ] ; then
+          echo "$file does not exist"
+          exit -43
+      fi
+      echo "<br>" >> $file
+      echo "<a class=\"myButton\" id=\"${name}\" align=\"center\" onclick=\"toggle(this.id);\">Show ${name} stats</a>" >> $file
+      echo "<div id=\"toggle${name}\" style=\"display: none\">" >> $file
+      echo "<br><hr>" >> $file
+      echo "<h2> $nameup STATS</h2><br>" >> $file
+  }
 
  function getlastfield {
      if [ "$#" -ne 1 ] ;then

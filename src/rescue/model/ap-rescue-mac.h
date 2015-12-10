@@ -27,6 +27,7 @@
 #include "ns3/traced-value.h"
 #include "ns3/random-variable-stream.h"
 #include "ns3/mac48-address.h"
+#include "ns3/timer.h"
 
 #include "rescue-mac.h"
 #include "rescue-mac-header.h"
@@ -41,6 +42,7 @@ namespace ns3 {
     class RescueMacCsma;
     class RescueMacTdma;
     class RescueRemoteStationManager;
+    class RescueArqManager;
     class RescueNetDevice;
 
     /**
@@ -70,6 +72,26 @@ namespace ns3 {
         virtual void Enqueue(Ptr<Packet> pkt, Mac48Address dest);
 
         /**
+         * \param pkt the packet to send.
+         * \param dest the address to which the packet should be sent.
+         *
+         * Should be used to enqueue retransmitted packets by ARQ manager
+         */
+        virtual void EnqueueRetry(Ptr<Packet> pkt, Mac48Address dest);
+
+        //virtual void NotifyEnqueueRelay (Ptr<Packet> pkt, Mac48Address dest);
+
+        virtual void NotifyEnqueuedPacket(Ptr<Packet> pkt, Mac48Address dest);
+
+        /**
+         * \param pkt the packet to send.
+         * \param phyHdr the header to send.
+         *
+         * Should be used to enqueue ACK/NACK packets by ARQ manager
+         */
+        virtual void EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader ackHdr);
+
+        /**
          * invoked by ReceivePacketDone to process DATA frames
          *
          * \param pkt the received DATA frame
@@ -91,13 +113,48 @@ namespace ns3 {
          */
         virtual void ReceiveBeacon(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
 
+        /**
+         * used by ARQ manager to notify about allowance for TX
+         */
+        virtual void NotifyTxAllowed(void);
+
+        virtual void NotifySendPacketDone(void);
+
     private:
-        void EndCP();
-        void GenerateRR();
-        void SendNow();
+        void GenerateBeacon(void);
+        void GenerateResourceReservationFor(Ptr<Packet> pktData);
+        void GenerateTdmaTimeSlotReservation();
+
+        bool MakeResourceReservation(Time duration, Mac48Address address);
+
+        void SendNow(void);
+
+        void StartTDMAtimeSlot(void);
+
+        void BeaconIntervalEnd(void);
+        void CfpEnd(void);
+        void TDMAtimeSlotEnd(void);
+
+        uint8_t m_supportedDataRates; //<! supported data rates setting
+        uint8_t m_channel; //<! channel number
+        uint8_t m_txPower; //<! TX power setting
+        Time m_beaconInterval; //<! beacon interval duration
+        Time m_cfpDuration; //<! Contention Free Period duration
+        Time m_tdmaTimeSlot; //<! TDMA time slot duration
+
+        Timer m_beaconTimer;
+        Timer m_cfpTimer;
+        std::map<uint8_t, Timer> m_slotAwaitingTimers;
+        Timer m_currentSlotTimer;
+
+        uint8_t m_schedulesNumber; //<! Number of schedules in current CFP
+        std::list<Mac48Address> m_schedules; //<! list of scheduled stations
+
+        std::map<Mac48Address, Time> m_reservedTime; //<! keeps the time reserved for each transmitter
 
     protected:
         virtual void DoInitialize();
+        virtual void DoDispose();
     };
 
 }

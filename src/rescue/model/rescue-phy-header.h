@@ -17,9 +17,7 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on ns-3 wifi module by:
- * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
 #ifndef RESCUE_PHY_HEADER_H
@@ -35,6 +33,7 @@
 #define RESCUE_PHY_PKT_TYPE_PART_ACK    2 //partial acknowledgment
 #define RESCUE_PHY_PKT_TYPE_B           3 //beacon
 #define RESCUE_PHY_PKT_TYPE_RR          4 //resource reservation
+
 
 
 namespace ns3 {
@@ -56,8 +55,6 @@ namespace ns3 {
                 uint8_t type, uint16_t duration, uint16_t seq, uint16_t mbf, uint16_t il);
         RescuePhyHeader(const Mac48Address srcAddr, const Mac48Address senderAddr, const Mac48Address dstAddr,
                 uint8_t type, uint16_t duration, uint32_t beaconRep, uint16_t seq, uint16_t mbf, uint16_t il);
-        RescuePhyHeader(const Mac48Address srcAddr, const Mac48Address dstAddr,
-                uint8_t type, uint16_t blockAck, uint8_t contAck, uint16_t seq);
         RescuePhyHeader(const Mac48Address srcAddr,
                 uint8_t type, uint32_t timestamp, uint32_t beaconInterval, uint32_t cfpPeriod, uint32_t tdmaTimeSlot);
         RescuePhyHeader(const Mac48Address srcAddr, const Mac48Address dstAddr,
@@ -92,7 +89,7 @@ namespace ns3 {
         /**
          * Sets Block ACK supported/requested
          */
-        void SetBlockAckSupported(void);
+        void SetBlockAckEnabled(void);
         /**
          * Sets Block ACK disabled
          */
@@ -100,7 +97,7 @@ namespace ns3 {
         /**
          * Sets Continous ACK supported/requested
          */
-        void SetContinousAckSupported(void);
+        void SetContinousAckEnabled(void);
         /**
          * Sets Continous ACK disabled
          */
@@ -108,7 +105,7 @@ namespace ns3 {
         /**
          * Sets QoS supported/requested
          */
-        void SetQosSupported(void);
+        void SetQosEnabled(void);
         /**
          * Sets QoS disabled
          */
@@ -202,6 +199,13 @@ namespace ns3 {
          * \param duration the beacon rep. field
          */
         void SetBeaconRep(uint32_t beaconRep);
+        /**
+         * used to configure block ACK flag for a specified frame
+         *
+         * \param received true if the frame was correctly received
+         * \param number of the frame in the block ACK field
+         */
+        void SetBlockAckFlagFor(bool received, uint8_t frameNumber);
         /**
          * \param blockAck the block ACK flag/field
          */
@@ -302,15 +306,15 @@ namespace ns3 {
         /**
          * \return true if block ACK flag is set
          */
-        bool IsBlockAckSupported(void) const;
+        bool IsBlockAckEnabled(void) const;
         /**
          * \return true if continous ACK flag is set
          */
-        bool IsContinousAckSupported(void) const;
+        bool IsContinousAckEnabled(void) const;
         /**
          * \return true if QoS flag is set
          */
-        bool IsQosSupported(void) const;
+        bool IsQosEnabled(void) const;
         /**
          * \return true if MAC protocol flag is set
          */
@@ -393,13 +397,19 @@ namespace ns3 {
          */
         uint32_t GetBeaconRep(void) const;
         /**
+         * used to inform if the specified frame indicated in block ACK field was received or not
+         *
+         * /param frameNumber number of the frame in the block ACK field
+         */
+        bool IsBlockAckFrameReceived(uint8_t frameNumber) const;
+        /**
          * \return the block ACK field value
          */
-        uint8_t GetBlockAck(void) const;
+        uint16_t GetBlockAck(void) const;
         /**
          * \return the continous ACK field value
          */
-        uint16_t GetContinousAck(void) const;
+        uint8_t GetContinousAck(void) const;
         /**
          * \return timestamp field value
          */
@@ -469,8 +479,8 @@ namespace ns3 {
         uint8_t m_dataRate; //<! data rate field (supported data rate in Beacon frame)
         uint8_t m_nACK; //<! NACK/ACK field (0-NACK, 1-ACK)
         uint8_t m_sendWindow; //<! send window field
-        uint8_t m_bAck; //<! block ACK field (1-requested/supported, 0-not allowed)
-        uint8_t m_contAck; //<! continous ACK field (1-requested/supported, 0-not allowed)
+        uint8_t m_useBlockAck; //<! block ACK field (1-requested/supported, 0-not allowed)
+        uint8_t m_useContinousAck; //<! continous ACK field (1-requested/supported, 0-not allowed)
         uint8_t m_qos; //<! QoS (1-supported, 0-not supported)
         uint8_t m_macProtocol; //<! MAC Protocol (0-distributed, 1-centralized)
         uint8_t m_retry; //<! retry flag (1-frame is retransmitted, 0-new frame)
@@ -484,7 +494,7 @@ namespace ns3 {
         uint16_t m_duration; //<! duration field
         uint16_t m_nextDuration; //<! next duration field
         uint32_t m_beaconRep; //<! beacon repetition field
-        uint16_t m_blockAck; //<! block ACK field/flag
+        uint8_t m_blockAck [16]; //<! block ACK field
         uint8_t m_continousAck; //<! continous ACK field/flag
         uint32_t m_timestamp; //<! timestamp field
         Mac48Address m_srcAddr; //<! source address field

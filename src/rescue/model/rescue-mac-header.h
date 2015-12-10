@@ -17,9 +17,7 @@
  *
  * Author: Lukasz Prasnal <prasnal@kt.agh.edu.pl>
  *
- * basing on ns-3 wifi module by:
- * Mathieu Lacage <mathieu.lacage@sophia.inria.fr>
- * Author: Mirko Banchi <mk.banchi@gmail.com>
+ * basing on Simple CSMA/CA Protocol module by Junseok Kim <junseok@email.arizona.edu> <engr.arizona.edu/~junseok>
  */
 
 #ifndef RESCUE_MAC_HEADER_H
@@ -45,6 +43,7 @@ namespace ns3 {
     class RescueMacHeader : public Header {
     public:
         RescueMacHeader(void);
+
         RescueMacHeader(const Mac48Address srcAddr, const Mac48Address dstAddr, uint8_t type);
         virtual ~RescueMacHeader(void);
 
@@ -54,12 +53,10 @@ namespace ns3 {
          * \param type the type field
          */
         void SetType(uint8_t type);
-
         /**
          * Set the Retry bit in the Frame Control field.
          */
         void SetRetry(void);
-
         /**
          * Un-set the Retry bit in the Frame Control field.
          */
@@ -71,12 +68,10 @@ namespace ns3 {
         void SetFrameControl(uint8_t ctrl);
 
         void SetSource(Mac48Address addr);
-
         /**
          * \param addr the destination address field
          */
         void SetDestination(Mac48Address addr);
-
         /**
          * \param seq the sequence number field
          */
@@ -86,7 +81,6 @@ namespace ns3 {
          * \return type the type field value
          */
         uint8_t GetType(void) const;
-
         /**
          * Return if the Retry bit is set.
          *
@@ -100,17 +94,14 @@ namespace ns3 {
          * \return addr the source address field value
          */
         Mac48Address GetSource(void) const;
-
         /**
          * \return addr the destination address field value
          */
         Mac48Address GetDestination(void) const;
-
         /**
          * \return seq the sequence number field value
          */
         uint16_t GetSequence(void) const;
-
         /**
          * \return the size of this header
          */

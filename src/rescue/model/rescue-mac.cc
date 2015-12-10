@@ -31,6 +31,7 @@
 #include "rescue-mac.h"
 #include "rescue-net-device.h"
 #include "rescue-remote-station-manager.h"
+#include "rescue-arq-manager.h"
 #include "low-rescue-mac.h"
 #include "rescue-mac-csma.h"
 #include "rescue-mac-tdma.h"
@@ -57,17 +58,19 @@ namespace ns3 {
     RescueMac::RescueMac()
     : m_phy(0),
     m_tdmaMac(0) {
-        //NS_LOG_FUNCTION (this);
+        NS_LOG_INFO("");
         m_random = CreateObject<UniformRandomVariable> ();
         m_csmaMac = CreateObject<RescueMacCsma> ();
         m_csmaMac->SetHiMac(this);
     }
 
     RescueMac::~RescueMac() {
+        NS_LOG_INFO("");
     }
 
     void
     RescueMac::DoInitialize() {
+        NS_LOG_INFO("");
     }
 
     void
@@ -116,11 +119,11 @@ namespace ns3 {
                 UintegerValue(20),
                 MakeUintegerAccessor(&RescueMac::SetQueueLimits),
                 MakeUintegerChecker<uint32_t> ())
-                .AddAttribute("BasicAckTimeout",
-                "ACK awaiting time",
-                TimeValue(MicroSeconds(3000)),
-                MakeTimeAccessor(&RescueMac::SetBasicAckTimeout),
-                MakeTimeChecker())
+                /*.AddAttribute ("BasicAckTimeout",
+                               "ACK awaiting time",
+                               TimeValue (MicroSeconds (3000)),
+                               MakeTimeAccessor (&RescueMac::SetBasicAckTimeout),
+                               MakeTimeChecker ())*/
 
                 .AddAttribute("CsmaMac", "The CsmaMac object",
                 PointerValue(),
@@ -184,6 +187,18 @@ namespace ns3 {
     }
 
     void
+    RescueMac::SetArqManager(Ptr<RescueArqManager> arqManager) {
+        //NS_LOG_FUNCTION (this << arqManager);
+        m_arqManager = arqManager;
+        if (m_csmaMac != 0) {
+            m_csmaMac->SetArqManager(m_arqManager);
+        }
+        if (m_tdmaMac != 0) {
+            m_tdmaMac->SetArqManager(m_arqManager);
+        }
+    }
+
+    void
     RescueMac::SetForwardUpCb(Callback<void, Ptr<Packet>, Mac48Address, Mac48Address> cb) {
         m_forwardUpCb = cb;
     }
@@ -229,8 +244,8 @@ namespace ns3 {
     RescueMac::SetSifs(Time duration) {
         if (m_csmaMac != 0)
             m_csmaMac->SetSifsTime(duration);
-        //if (m_tdmaMac != 0)
-        //  m_tdmaMac->SetSifsTime (duration);
+        if (m_tdmaMac != 0)
+            m_tdmaMac->SetSifsTime(duration);
     }
 
     void
@@ -245,17 +260,18 @@ namespace ns3 {
     RescueMac::SetQueueLimits(uint32_t length) {
         if (m_csmaMac != 0)
             m_csmaMac->SetQueueLimits(length);
-        //if (m_tdmaMac != 0)
-        //  m_tdmaMac->SetQueueLimits (length);
+        if (m_tdmaMac != 0)
+            m_tdmaMac->SetQueueLimits(length);
     }
 
-    void
-    RescueMac::SetBasicAckTimeout(Time duration) {
-        if (m_csmaMac != 0)
-            m_csmaMac->SetBasicAckTimeout(duration);
-        //if (m_tdmaMac != 0)
-        //  m_tdmaMac->SetBasicAckTimeout (duration);
-    }
+    /*void
+    RescueMac::SetBasicAckTimeout (Time duration)
+    {
+      if (m_csmaMac != 0)
+        m_csmaMac->SetBasicAckTimeout (duration);
+      //if (m_tdmaMac != 0)
+      //  m_tdmaMac->SetBasicAckTimeout (duration);
+    }*/
 
     // ------------------------ Get Functions -----------------------------
 
@@ -314,14 +330,15 @@ namespace ns3 {
         else return 0;
     }
 
-    Time
-    RescueMac::GetBasicAckTimeout(void) const {
-        if (m_csmaMac != 0)
-            return m_csmaMac->GetBasicAckTimeout();
-            //else if (m_tdmaMac != 0)
-            //  return m_tdmaMac->GetBasicAckTimeout ()
-        else return Seconds(0);
-    }
+    /*Time
+    RescueMac::GetBasicAckTimeout (void) const
+    {
+      if (m_csmaMac != 0)
+        return m_csmaMac->GetBasicAckTimeout ();
+      //else if (m_tdmaMac != 0)
+      //  return m_tdmaMac->GetBasicAckTimeout ()
+      else return Seconds (0);
+    }*/
 
 
 
@@ -346,11 +363,34 @@ namespace ns3 {
     }
 
     void
+    RescueMac::EnqueueRetry(Ptr<Packet> pkt, Mac48Address dst) {
+        NS_FATAL_ERROR("This MAC entity (" << this << ", " << GetAddress()
+                << ") does not support EnqueueRetry ()");
+    }
+
+    void
+    //RescueMac::NotifyEnqueueRelay (Ptr<Packet> pkt, Mac48Address dst)
+    RescueMac::NotifyEnqueuedPacket(Ptr<Packet> pkt, Mac48Address dst) {
+        NS_FATAL_ERROR("This MAC entity (" << this << ", " << GetAddress()
+                << ") does not support NotifyEnqueueRelay ()");
+    }
+
+    void
+    RescueMac::EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_FATAL_ERROR("This MAC entity (" << this << ", " << GetAddress()
+                << ") does not support EnqueueAck ()");
+    }
+
+    void
     RescueMac::EnqueueOk(Ptr<const Packet> pkt, const RescueMacHeader &hdr) {
         NS_LOG_FUNCTION(this << hdr);
         m_traceEnqueue(m_device->GetNode()->GetId(), m_device->GetIfIndex(), pkt, hdr);
     }
 
+    void
+    RescueMac::NotifySendPacketDone() {
+        NS_LOG_FUNCTION("");
+    }
 
     // ---------------------- Receive Functions ----------------------------
 
@@ -383,5 +423,15 @@ namespace ns3 {
     RescueMac::ShouldBeForwarded(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
         return true;
     }
+
+
+
+    // ---------------------- Receive Functions ----------------------------
+
+    void
+    RescueMac::NotifyTxAllowed(void) {
+        NS_LOG_FUNCTION("");
+    }
+
 
 } // namespace ns3

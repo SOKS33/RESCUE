@@ -14,7 +14,9 @@
 #include <vector>
 
 namespace ns3 {
-    // =========================BPSK 1=========================
+    //===============================NEW_MODULATION================================================================
+
+    // =========================BPSK_1=========================
 
     const double BPSK_1_mi[] = {
         0.26353698, 0.323915577, 0.396270942, 0.482062256, 0.582466961, 0.6981104, 0.828719961, 0.972731349, 0.987761338, 1.002890414,
@@ -50,7 +52,7 @@ namespace ns3 {
         -9.796877817, -10.40642768, -18.19753719
     }; // length: 23
 
-    // =========================BPSK 2=========================
+    // =========================BPSK_2=========================
 
     const double BPSK_2_mi[] = {
         0.52707396, 0.647831155, 0.792541885, 0.964124511, 1.164933921, 1.18668354, 1.208739856, 1.231103134,
@@ -82,7 +84,7 @@ namespace ns3 {
     }; // length: 16
 
 
-    // =========================BPSK 3=========================
+    // =========================BPSK_3=========================
 
     const double BPSK_3_mi[] = {
         0.417127171, 0.517665796, 0.640761361, 0.79061094, 0.971746732,
@@ -118,7 +120,9 @@ namespace ns3 {
         -8.392875994, -12.31700421, -18.19753719
     }; // length: 13
 
-    // =========================QPSK 1=========================
+    //===============================NEW_MODULATION================================================================
+
+    // =========================QPSK_1=========================
 
     const double QPSK_1_mi[] = {
         0.138731834, 0.172174041, 0.213121554, 0.262972002, 0.323235271, 0.395459546, 0.481105782, 0.581355563, 0.696841564, 0.827302389,
@@ -154,7 +158,7 @@ namespace ns3 {
         -5.695821746, -6.787830095, -7.567032575, -8.330246928, -8.38441208, -10.86647689, -11.90782162, -12.87452721, -14.83024136, -15.55847986
     }; // length: 30
 
-    // =========================QPSK 2=========================
+    // =========================QPSK_2=========================
 
     const double QPSK_2_mi[] = {
         0.143517261, 0.179063132, 0.223093174, 0.277463668, 0.344348082, 0.426243109, 0.525944004, 0.646470541, 0.790919092, 0.962211563,
@@ -195,7 +199,7 @@ namespace ns3 {
         -15.79964192, -17.0989249
     }; // length: 32
 
-    // =========================QPSK 3=========================
+    // =========================QPSK_3=========================
 
     const double QPSK_3_mi[] = {
         0.137835029, 0.172339591, 0.215275892, 0.268594699, 0.334639762, 0.416195502, 0.516522123, 0.639364663, 0.788916006, 0.969705812,
@@ -231,20 +235,196 @@ namespace ns3 {
         -3.662179102, -4.275572417, -5.345817863, -7.088363305, -9.510095026, -13.16709927, -18.19753719
     }; // length: 27
 
-    /**
-     * \ingroup rescue
-     *
-     * Implements the BlackBox_no2
-     */
+    //===============================NEW_MODULATION================================================================
+
+    // =========================16QAM_1=========================
+
+    const double QAM16_1_mi[] = {
+        0.734544517, 0.81376787, 0.894578668, 0.975627393, 1.054647729, 1.128388195, 1.193135226, 1.2071107, 1.221086173, 1.233385785,
+        1.245685397, 1.28434127, 1.309510567
+    }; // length: 13
+
+    const double QAM16_1_alpha[] = {
+        0, 0, 0, 0, 0, 0, 0.0999, 0.6789, 0.9697, 0.9902, 0.9922, 0.9967, 0.9992
+    }; // length: 13
+
+    const double QAM16_1_mu[] = {
+        3321.2937, 3538.5633, 3430.3694, 3158.5102, 2613.522, 1745.716, 527.6548161, 312.540953, 111.8151815, 4.37755102,
+        3.333333333, 2.333333333, 2
+    }; // length: 13
+
+    const double QAM16_1_sigma[] = {
+        59.38882676, 64.44842863, 73.50842872, 86.18723757, 105.8831169, 133.9490649, 196.3266961, 178.3644571, 134.7554033, 8.983966596,
+        2.881497927, 1.779513042, 1.603567451
+    }; // length: 13
+
+    const double QAM16_1_ber[] = {
+        0.395392107, 0.421257536, 0.40837731, 0.376013119, 0.311133571, 0.207823333, 0.056540726, 0.01194725, 0.000403333, 5.10714E-06,
+        3.09524E-06, 9.16667E-07, 1.90476E-07
+    }; // length: 13
+
+    const double QAM16_1_ber_Log[] = {
+        -0.92787733, -0.864510909, -0.895563754, -0.978131245, -1.167532969, -1.571066919, -2.872794083, -4.427254153, -7.815747208, -12.18487044,
+        -12.68564573, -13.90252193, -15.47373863
+    }; // length: 13
+
+    // =========================16QAM_2=========================
+
+    const double QAM16_2_mi[] = {
+        0.772312252, 0.89514117, 1.02734404, 1.167820925, 1.315444899, 1.469089033, 1.500572673, 1.532056313, 1.563745654, 1.62753574
+    }; // length: 10
+
+    const double QAM16_2_alpha[] = {
+        0, 0, 0, 0, 0, 0.2098, 0.8756, 0.9866, 0.9907, 0.9924
+    }; // length: 10
+
+    const double QAM16_2_mu[] = {
+        3892.9834, 3783.5061, 3612.3078, 3333.4405, 2816.9507, 419.1050367, 98.54742765, 2.514925373, 1.139784946, 1.092105263
+    }; // length: 10
+
+    const double QAM16_2_sigma[] = {
+        62.34092367, 68.97527471, 77.41416637, 93.86901618, 142.8649107, 466.8819833, 211.0163968, 7.547080374, 0.348643266, 0.333771642
+    }; // length: 10
+
+    const double QAM16_2_ber[] = {
+        0.463450405, 0.450417393, 0.430036643, 0.396838155, 0.335351274, 0.03942581, 0.00145944, 4.0119E-06, 1.2619E-06, 9.88095E-07
+    }; // length: 10
+
+    const double QAM16_2_ber_Log[] = {
+        -0.769055901, -0.797580586, -0.843884858, -0.924226752, -1.092576718, -3.233334613, -6.529702152, -12.42624443, -13.58288826, -13.82748675
+    }; // length: 10
+
+    // =========================16QAM_3=========================
+
+    const double QAM16_3_mi[] = {
+        0.837591136, 0.989741372, 1.158468377, 1.342711755, 1.54101606, 1.751731387, 1.795524611, 1.839317834, 1.883605026, 1.973167348
+    }; // length: 10
+
+    const double QAM16_3_alpha[] = {
+        0, 0, 0, 0, 0, 0.3888, 0.9416, 0.9965, 0.997, 0.9982
+    }; // length: 10
+
+    const double QAM16_3_mu[] = {
+        3954.3474, 3853.0885, 3697.7739, 3446.9112, 2930.5285, 283.0394306, 82.53082192, 3.2, 1.066666667, 1
+    }; // length: 10
+
+    const double QAM16_3_sigma[] = {
+        60.30770278, 67.56609938, 76.41350588, 97.97072083, 169.8110902, 390.3205291, 203.7472514, 8.090662737, 0.253708132, 0
+    }; // length: 10
+
+    const double QAM16_3_ber[] = {
+        0.470755643, 0.458701012, 0.440211179, 0.410346571, 0.34887244, 0.020594488, 0.000573786, 1.33333E-06, 3.80952E-07, 2.14286E-07
+    }; // length: 10
+
+    const double QAM16_3_ber_Log[] = {
+        -0.753416125, -0.779356671, -0.820500716, -0.89075318, -1.053048924, -3.882731807, -7.463254551, -13.52782849, -14.78059145, -15.3559556
+    }; // length: 10
+
+    //===============================MIXED_MODULATION================================================================
+
+    // =========================QPSK+16QAM_2=========================
+
+    const double QPSK_QAM16_2_mi[] = {
+        0.430936599, 0.527458377, 0.641982212, 0.776165188, 0.931016013, 1.106499434, 1.301102857, 1.383719308, 1.468509744, 1.511447997
+    }; // length: 10
+
+    const double QPSK_QAM16_2_alpha[] = {
+        0, 0, 0, 0, 0, 0, 0.5392, 0.9917, 0.9912, 0.9933
+    }; // length: 10
+
+    const double QPSK_QAM16_2_mu[] = {
+        2912.3751, 2677.3632, 2388.2207, 2030.7582, 1575.2358, 968.209, 44.12825521, 1.313253012, 1.056818182, 1.253731343
+    }; // length: 10
+
+    const double QPSK_QAM16_2_sigma[] = {
+        57.10555406, 59.34429257, 61.88248004, 65.16772833, 71.32964033, 84.70265033, 53.06699306, 0.999118036, 0.232821502, 0.724951066
+    }; // length: 10
+
+    const double QPSK_QAM16_2_ber[] = {
+        0.346711321, 0.318733714, 0.284311988, 0.241756929, 0.187528071, 0.115262976, 0.00242075, 1.29762E-06, 1.10714E-06, 0.000001
+    }; // length: 10
+
+    const double QPSK_QAM16_2_ber_Log[] = {
+        -1.059262772, -1.143399276, -1.257683094, -1.419822485, -1.67382673, -2.160539012, -6.023677869, -13.55497947, -13.71372786, -13.81551056
+    }; // length: 10
+
+    // =========================QPSK+QPSK+16QAM_3=========================
+
+    const double QPSK_QPSK_QAM16_3_mi[] = {
+        0.496977856, 0.613402239, 0.754171869, 0.922917923, 1.123087993, 1.235882865, 1.357520751, 1.408857616, 1.515492891, 1.627857577
+    }; // length: 10
+
+    const double QPSK_QPSK_QAM16_3_alpha[] = {
+        0, 0, 0, 0, 0, 0, 0.0501, 0.6925, 0.9966, 0.9972
+    }; // length: 10
+
+    const double QPSK_QPSK_QAM16_3_mu[] = {
+        2609.5763, 2307.1954, 1916.8165, 1414.5638, 789.9273, 454.1105, 102.2722392, 27.85365854, 1.058823529, 1.035714286
+    }; // length: 10
+
+    const double QPSK_QPSK_QAM16_3_sigma[] = {
+        60.02613341, 64.37086126, 68.71174251, 72.3960237, 72.54487777, 68.84334267, 66.50701455, 34.02576689, 0.238832574, 0.188982237
+    }; // length: 10
+
+    const double QPSK_QPSK_QAM16_3_ber[] = {
+        0.310663845, 0.274666119, 0.22819244, 0.168400452, 0.094038964, 0.054060774, 0.011565286, 0.001019643, 4.28571E-07, 3.45238E-07
+    }; // length: 10
+
+    const double QPSK_QPSK_QAM16_3_ber_Log[] = {
+        -1.169043835, -1.292199032, -1.477565969, -1.781410491, -2.364046069, -2.917646424, -4.459747279, -6.888302853, -14.66280842, -14.87903153
+    }; // length: 10
+
+    // =========================QPSK+16QAM+16QAM_3=========================
+
+    const double QPSK_QAM16_QAM16_3_mi[] = {
+        0.538637927, 0.659457207, 0.802858642, 0.970974813, 1.165190463, 1.38569648, 1.433198364, 1.481222918, 1.5303124, 1.631016647
+    }; // length: 10
+
+    const double QPSK_QAM16_QAM16_3_alpha[] = {
+        0, 0, 0, 0, 0, 0.7019, 0.9934, 0.9963, 0.9954, 0.997
+    }; // length: 10
+
+    const double QPSK_QAM16_QAM16_3_mu[] = {
+        2875.161, 2618.1523, 2292.2155, 1860.3305, 1228.7083, 36.29922845, 5.03030303, 1.081081081, 1.152173913, 1
+    }; // length: 10
+
+    const double QPSK_QAM16_QAM16_3_sigma[] = {
+        57.96538517, 62.93305619, 66.58672119, 74.65082414, 98.0044402, 52.2387944, 12.12368273, 0.276724731, 0.419914875, 0
+    }; // length: 10
+
+    const double QPSK_QAM16_QAM16_3_ber[] = {
+        0.342281071, 0.311684798, 0.272882798, 0.221467917, 0.146274798, 0.00128819, 3.95238E-06, 4.7619E-07, 6.30952E-07, 3.57143E-07
+    }; // length: 10
+
+    const double QPSK_QAM16_QAM16_3_ber_Log[] = {
+        -1.072123033, -1.165762866, -1.298712889, -1.507477546, -1.922268251, -6.654516777, -12.44119239, -14.5574479, -14.27603544, -14.84512998
+    }; // length: 10
+
+    class BlackBox_no2Entry {
+    public:
+        double m_snr; // snr of the previous hop
+        double m_ber; // packet error rate of the packet of the hop before the previous hop
+        int m_constellationSize; // constellation size
+        double m_spectralEfficiency; // spectral Efficiency
+
+        BlackBox_no2Entry(double snr, double ber, int constellationSize, double spectralEfficiency) :
+        m_snr(snr),
+        m_ber(ber),
+        m_constellationSize(constellationSize),
+        m_spectralEfficiency(spectralEfficiency) {
+        }
+    };
+
     class BlackBox_no2 : public Object {
     public:
         static TypeId
         GetTypeId(void);
 
         BlackBox_no2();
-        virtual ~BlackBox_no2();
+        virtual
+        ~BlackBox_no2();
 
-        /**
+        /*
          * Function   blackbox_no2
          * Description: Calculate number of errors per packet after channel decoding
          * code block length L is fixed (L=8000 as specified in WP3)
@@ -265,13 +445,17 @@ namespace ns3 {
          *
          */
 
-        static int CalculateRescueBitErrorNumber(double MI, double p_floor, int n_link, int constellationSize); // you have to be sure that there are at least 3 links
-        static int CalculateRescueBitErrorNumber(std::vector<double> snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency); // includes the calculation of BlackBox_no1
-        static int CalculateRescueBitErrorNumber(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> linkConstellationSize, std::vector<double> linkSpectralEfficiency); // includes the calculation of Black_no1
+        static int CalculateRescueBitErrorNumber(double MI, double p_floor, int n_link, int constellationSize, int block_length); // you have to be sure that there are at maximum 3 links
+        static int CalculateRescueBitErrorNumber(std::vector<double> & snr_db, std::vector<double> linkBitER, int constellationSize, double spectralEfficiency, int block_length); // includes the calculation of Blackbox_no1
+        static int CalculateRescueBitErrorNumber(std::vector<double> snr_db, std::vector<double> linkBitER, std::vector<int> linkConstellationSize, std::vector<double> linkSpectralEfficiency, int block_length); // includes the calculation of Blackbox_no1
 
     private:
         static double Interpolation(std::vector<double> x, std::vector<double> y, double x_query); // interpolation among two (x1,y2)(x2,y2) values, given back y_query
-        static std::vector<double> Fill(const double arr[], int length); // fill the arrays in a vector
+        static bool TestAllEntriesEqual(std::vector<int> vector); // test if all entries in the vector equal
+        static int DetermineModulationCase(std::vector<int> vector); // determine the case if we have QPSK-16QAM, QPSK-QPSK-16QAM, QPSK-16QAM-16QAM
+        static std::vector<double> GenerateRandomBlock(int blockLength, double p_floor);
+        static int FindNumberErrors(std::vector<double> block);
+        inline static int sgn(double x);
     };
 
 }

@@ -36,15 +36,12 @@
 #include "rescue-phy-header.h"
 #include "snr-per-tag.h"
 #include "blackbox_no1.h"
-#include "blackbox_no1.h"
 #include "blackbox_no2.h"
-#include "src/core/model/object.h"
-#include "ns3/node.h"
 
 NS_LOG_COMPONENT_DEFINE("RescuePhy");
 
 #undef NS_LOG_APPEND_CONTEXT
-#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetSeconds() << "] [addr=" << ((m_mac != 0) ? compressMac(m_mac->GetAddress ()) : 0) << "] [PHY] "
+#define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now().GetMicroSeconds() << "] [addr=" << ((m_mac != 0) ? compressMac(m_mac->GetAddress ()) : 0) << "] [PHY] "
 
 #define Min(a,b) ((a < b) ? a : b)
 #define Max(a,b) ((a > b) ? a : b)
@@ -59,8 +56,11 @@ namespace ns3 {
     m_csmaMac(0),
     m_channel(0),
     m_pktRx(0) {
+        m_state = IDLE;
         m_csBusy = false;
+        m_rxBusy = false;
         m_csBusyEnd = Seconds(0);
+        m_rxBusyEnd = Seconds(0);
         m_random = CreateObject<UniformRandomVariable> ();
 
         m_deviceRateSet.push_back(RescuePhy::GetOfdm3Mbps());
@@ -85,22 +85,16 @@ namespace ns3 {
     RescuePhy::RxFrameCopies::RxFrameCopies(RescuePhyHeader phyHdr,
             Ptr<Packet> pkt,
             std::vector<double> snr_db,
-            std::vector<double> linkPER,
             std::vector<double> linkBER,
-            //double constellationSize,
             std::vector<int> constellationSizes,
-            //double spectralEfficiency,
             std::vector<double> spectralEfficiencies,
             int packetLength,
             Time tstamp)
     : phyHdr(phyHdr),
     pkt(pkt),
     snr_db(snr_db),
-    linkPER(linkPER),
     linkBER(linkBER),
-    //constellationSize (constellationSize),
     constellationSizes(constellationSizes),
-    //spectralEfficiency (spectralEfficiency),
     spectralEfficiencies(spectralEfficiencies),
     packetLength(packetLength),
     tstamp(tstamp) {
@@ -141,11 +135,6 @@ namespace ns3 {
                 DoubleValue(0.5),
                 MakeDoubleAccessor(&RescuePhy::m_berThr),
                 MakeDoubleChecker<double> ())
-                .AddAttribute("UseBB2",
-                "Use BlackBox #2 for error calculation? (if it is possible)",
-                BooleanValue(false),
-                MakeBooleanAccessor(&RescuePhy::m_useBB2),
-                MakeBooleanChecker())
                 .AddAttribute("UseLOTF",
                 "Use links-on-the-fly",
                 BooleanValue(true),
@@ -157,6 +146,9 @@ namespace ns3 {
                 .AddTraceSource("RecvOk",
                 "Trace Hookup for enqueue a DATA",
                 MakeTraceSourceAccessor(&RescuePhy::m_traceRecv))
+                .AddTraceSource("UpdateSNR",
+                "Trace Hookup for forwarding SNR back to the sim file",
+                MakeTraceSourceAccessor(&RescuePhy::m_updateSNR))
                 ;
         return tid;
     }
@@ -191,12 +183,14 @@ namespace ns3 {
     void
     RescuePhy::NotifyCFP() {
         NS_LOG_FUNCTION("");
+        NS_LOG_INFO("CFP");
         m_lowMac = m_tdmaMac;
     }
 
     void
     RescuePhy::NotifyCP() {
         NS_LOG_FUNCTION("");
+        NS_LOG_INFO("CP");
         m_lowMac = m_csmaMac;
     }
 
@@ -248,7 +242,6 @@ namespace ns3 {
             NS_LOG_DEBUG("Already in transmission mode");
             return false;
         }
-
         Ptr<Packet> p = pkt->Copy(); //copy packet stored in MAC layer
 
         m_state = TX;
@@ -260,6 +253,7 @@ namespace ns3 {
         RescuePhyHeader currentPhyHdr = RescuePhyHeader(currentMacHdr.GetSource(),
                 currentMacHdr.GetSource(),
                 currentMacHdr.GetDestination(),
+                //                RESCUE_PHY_PKT_TYPE_DATA,
                 currentMacHdr.GetType(),
                 currentMacHdr.GetSequence(),
                 il);
@@ -269,7 +263,7 @@ namespace ns3 {
         Time txDuration = CalTxDuration(currentPhyHdr.GetSize(), p->GetSize(),
                 GetPhyHeaderMode(mode), mode);
 
-        NS_LOG_DEBUG("Tx will finish at " << (Simulator::Now() + txDuration).GetSeconds() <<
+        NS_LOG_DEBUG("Tx will finish at " << (Simulator::Now() + txDuration).GetMicroSeconds() <<
                 " (" << txDuration.GetNanoSeconds() << "ns), txPower: " << m_txPower);
 
         p->AddHeader(currentPhyHdr);
@@ -278,6 +272,12 @@ namespace ns3 {
         m_channel->SendPacket(Ptr<RescuePhy> (this), p, m_txPower, mode, txDuration);
 
         return true;
+    }
+
+    //MODIF
+
+    void RescuePhy::NotifyMacDelay(Time delay) {
+        m_lowMac->SetChannelDelay(delay);
     }
 
     bool
@@ -294,6 +294,9 @@ namespace ns3 {
         m_state = TX;
         Time txDuration = CalTxDuration(relayedPkt.second.GetSize(), relayedPkt.first->GetSize(),
                 GetPhyHeaderMode(mode), mode);
+
+        //MODIF 2
+        m_lowMac->SetTxDuration(txDuration);
 
         NS_LOG_DEBUG("Tx will finish at " << (Simulator::Now() + txDuration).GetSeconds() <<
                 " (" << txDuration.GetNanoSeconds() << "ns), txPower: " << m_txPower);
@@ -326,8 +329,8 @@ namespace ns3 {
     RescuePhy::ReceivePacket(Ptr<Packet> pkt, RescueMode mode, Time txDuration, double_t rxPower) {
         NS_LOG_FUNCTION("rxPower:" << rxPower <<
                 "mode:" << mode <<
-                "busyEnd:" << m_csBusyEnd);
-
+                "busyEnd:" << m_csBusyEnd <<
+                "rxBusyEnd:" << m_rxBusyEnd);
         NS_LOG_DEBUG("Node " << (uint16_t) compressMac(m_device->GetMac()->GetAddress()) << " \t THRE" << m_csThr << "\t RX POWEEEER " << rxPower);
 
 
@@ -339,27 +342,40 @@ namespace ns3 {
         // Start RX when energy is bigger than carrier sense threshold
         //
         Time txEnd = Simulator::Now() + txDuration;
-        if (rxPower > m_csThr && txEnd > m_csBusyEnd) {
-            if (m_csBusy == false) {
-                m_csBusy = true;
-                m_pktRx = pkt;
-                m_lowMac->ReceivePacket(this, pkt);
-                //MODIF
-            } else {
-                NS_LOG_DEBUG("PHY BUSYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
-                doubleReception = true;
+
+        if (rxPower > m_csThr) {
+            if (txEnd > m_csBusyEnd) {
+                if (m_csBusy == false) {
+                    m_csBusy = true;
+                    m_lowMac->ReceivePacket(this, pkt);
+                }
+                //                else {
+                //                    NS_LOG_UNCOND("PHY BUSYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY");
+                //                }
+                m_state = RX;
+                m_csBusyEnd = txEnd;
             }
-            m_state = RX;
-            m_csBusyEnd = txEnd;
+            if ((rxPower > m_rxThr) && (txEnd > m_rxBusyEnd)) {
+                if (m_rxBusy == false) {
+                    m_rxBusy = true;
+                    m_pktRx = pkt;
+                    m_lowMac->ReceivePacket(this, pkt);
+                }
+                m_state = RX;
+                m_rxBusyEnd = txEnd;
+            }
         }
     }
 
     void
     RescuePhy::ReceivePacketDone(Ptr<Packet> pkt, RescueMode mode, double rxPower) {
-        NS_LOG_FUNCTION("busyEnd:" << m_csBusyEnd);
+        NS_LOG_FUNCTION("busyEnd:" << m_csBusyEnd << "rxBusyEnd:" << m_rxBusyEnd);
 
         if (m_csBusyEnd <= Simulator::Now() + NanoSeconds(1)) {
             m_csBusy = false;
+        }
+        if (m_rxBusyEnd <= Simulator::Now() + NanoSeconds(1)) {
+            m_rxBusy = false;
         }
 
         if (m_state != RX) {
@@ -367,18 +383,11 @@ namespace ns3 {
             return;
         }
 
-        //MODIF
-        //        if (doubleReception) {
-        //            rxPower -= 20.0;
-        //            NS_LOG_UNCOND(this->m_device->GetNode()->GetId() << " Receiving multiple packets at once, lowering RXPOWER !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        //        }
-
         // We do support SINR !!
         double noiseW = m_channel->GetNoiseW(this, pkt); // noise plus interference
         //double rxPowerW = m_channel->DbmToW (rxPower);
         double sinr = rxPower - m_channel->WToDbm(noiseW);
-
-        NS_LOG_INFO("rxPower: " << rxPower << " ,noise: " << m_channel->WToDbm(noiseW) << " ,sinr: " << sinr);
+        NS_LOG_INFO("rxPower: " << rxPower << ", noise: " << m_channel->WToDbm(noiseW) << ", sinr: " << sinr);
 
         if ((rxPower > m_rxThr) && (pkt == m_pktRx)) {
 
@@ -393,55 +402,33 @@ namespace ns3 {
             snr_db.push_back(sinr);
             linkPER.push_back(0.0);
 
-            double hsr = 1.0; //header success rate
+            bool correct = true;
 
-            //Calculate Preamble Success Rate
-            /*hsr *= CalculateChunkSuccessRate (sinr,
-                                              GetPhyPreambleDuration (mode),
-                                              GetPhyPreambleMode (mode));*/
+            //Check if number of errors in preamble is equal to 0
             int preambleBits = GetPhyPreambleDuration(mode).GetMicroSeconds() * GetPhyPreambleMode(mode).GetDataRate() / 1000000;
-            hsr *= (1 - BlackBox_no1::CalculateRescuePacketErrorRate(snr_db, linkPER,
+            correct = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(snr_db, linkPER,
                     GetPhyPreambleMode(mode).GetConstellationSize(),
                     GetPhyPreambleMode(mode).GetSpectralEfficiency(),
-                    preambleBits));
+                    preambleBits)));
 
-            //Calculate PHY Header Success Rate
-            /*hsr *= CalculateChunkSuccessRate (sinr,
-                                              GetPhyHeaderDuration (hdr, mode),
-                                              GetPhyHeaderMode (mode));*/
-            hsr *= (1 - BlackBox_no1::CalculateRescuePacketErrorRate(snr_db, linkPER,
+            //Check if number of errors in PHY header is equal to 0
+            correct = (correct && (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(snr_db, linkPER,
                     GetPhyHeaderMode(mode).GetConstellationSize(),
                     GetPhyHeaderMode(mode).GetSpectralEfficiency(),
-                    8 * hdr.GetSize()));
-            /*hsr *= (1 - BlackBox_no1::CalculateRescuePacketErrorRate (snr_db, linkPER,
-                                                                      GetPhyHeaderMode (mode).GetConstellationSize (),
-                                                                      GetPhyHeaderMode (mode).GetSpectralEfficiency (),
-                                                                      8 * hdr.GetSize () ) );*/
-            double her = 1 - hsr; //header error rate*/
-
-            bool correct = true;
-            /*if (m_useBB2)
-               correct = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber (snr_db,
-                                                                             BlackBox_no1::PERtoBER (linkPER, 272),
-                                                                             GetPhyHeaderMode (mode).GetConstellationSize (),
-                                                                             GetPhyHeaderMode (mode).GetSpectralEfficiency ()) ) );
-            else
-              {*/
-            //correct = (m_random->GetValue () > her);
-            //}
+                    8 * hdr.GetSize()))));
 
             NS_LOG_DEBUG("mode=" << mode <<
                     ", snr=" << sinr <<
-                    ", her=" << her <<
                     ", size=" << pkt->GetSize());
+
+            //MODIF 4
+            m_updateSNR(sinr);
 
             if (correct) //is the PHY header complete
             {
                 //PHY HEADER CORRECTLY RECEIVED
                 NS_LOG_INFO("PHY HDR CORRECT");
                 m_state = IDLE;
-                //MODIF
-                doubleReception = false;
 
                 NS_LOG_FUNCTION("src:" << hdr.GetSource() <<
                         "sender:" << hdr.GetSender() <<
@@ -454,62 +441,37 @@ namespace ns3 {
                 } else //PER (and SNR?) tag must be updated
                 {
                     SnrPerTag tag;
-                    //double per = (pkt->PeekPacketTag (tag) ? tag.GetPER () : 0); //packet (payload) error rate
-                    double ber = (pkt->PeekPacketTag(tag) ? tag.GetBER() : 0); //packet (payload) bit error rate
-                    double per = BlackBox_no1::BERtoPER(ber, 8 * pkt->GetSize());
+                    double prev_ber = (pkt->PeekPacketTag(tag) ? tag.GetBER() : 0); //packet (payload) bit error rate
                     double snr = (pkt->PeekPacketTag(tag) ? tag.GetSNR() : (m_txPower - m_channel->WToDbm(noiseW))); //packet SNR (if not recorded, use maximal possible value)
-                    //                    NS_LOG_UNCOND("PER from previous hops: " << per << ", BER: " << ber << ", min SNR on route: " << snr);
+                    NS_LOG_DEBUG("BER from previous hops: " << prev_ber << ", min SNR on route: " << snr);
 
-                    /*double psr = 1 - per; //packet (payload) success rate
-                    psr *= CalculateChunkSuccessRate (sinr,
-                                                      GetDataDuration (pkt, mode),
-                                                      mode); //should we modify PER value with by the result of classic error-rate-model?
-                    per = 1 - psr;
-                    NS_LOG_DEBUG ("PER after last hop: " << per);*/
-                    //                    NS_LOG_UNCOND("TAG " << tag.GetSNR());
-                    //snr_db.push_back (sinr);
-                    //linkPER[0] = per;
-                    NS_LOG_DEBUG("snrdb " << sinr << " LINKBER " << ber);
                     std::vector<double> linkBER;
-                    linkBER.push_back(ber);
-                    ber = BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBER, //linkPER,
-                            //BlackBox_no1::PERtoBER (linkPER, 8 * pkt->GetSize ()),
+                    linkBER.push_back(prev_ber);
+                    double current_ber = BlackBox_no1::CalculateRescueBitErrorRate(snr_db, linkBER,
                             mode.GetConstellationSize(),
                             mode.GetSpectralEfficiency());
-                    per = BlackBox_no1::BERtoPER(ber, 8 * pkt->GetSize());
-                    NS_LOG_DEBUG("PER after last hop (from BlackBox_no1): " << per << ", BER: " << ber);
-
-                    //update packet tag
-                    //tag.SetSNR (sinr); //not shure what to do - store last hp snr?!?
-                    tag.SetSNR(Min(sinr, snr)); //not shure what to do - store minimal snr?!?
-                    //tag.SetPER (per);
-                    tag.SetBER(ber);
-                    pkt->ReplacePacketTag(tag);
+                    NS_LOG_DEBUG("BER after last hop (from BlackBox_no1): " << current_ber);
 
                     //NS_LOG_DEBUG ("data rate: " << mode.GetDataRate () << " phy rate: " << mode.GetPhyRate () << " constellation size: " << (int)mode.GetConstellationSize () << " spectralEfficiency: " << mode.GetSpectralEfficiency ());
 
-                    //should BlackBox #2 be used?
-                    bool useBB2 = (m_useBB2 //BlackBox #2 enabled?
-                            && ((mode.GetConstellationSize() == 2) || (mode.GetConstellationSize() == 4))); //supported modulations
-                    //&& (snr_db.size () <= 2) //supported number of links
-                    //&& !((snr_db.size () == 1) && (linkPER[0] > 0)) ); //bug in BlackBox #2 for single link calculation
-
                     if (hdr.GetDestination() != m_mac->GetAddress()) //RELAY THIS FRAME? - no payload processing but PER tag must be updated
                     {
+                        //update packet tag
+                        tag.SetSNR(Min(sinr, snr)); //not shure what to do - store minimal snr?!?
+                        tag.SetBER(current_ber);
+                        pkt->ReplacePacketTag(tag);
+
                         if (m_useLOTF) //LOTF used, is the BER sufficient?
                         {
-                            correct = (ber <= m_berThr);
+                            correct = (current_ber <= m_berThr);
                             NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [because ber <= m_berThr]");
-                        } else if (useBB2) //no LOTF, is the payload correct
+                        } else //no LOTF, is the payload correct
                         {
                             correct = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(snr_db, linkBER,
-                                    //BlackBox_no1::PERtoBER (linkPER, 8000),
                                     mode.GetConstellationSize(),
-                                    mode.GetSpectralEfficiency())));
+                                    mode.GetSpectralEfficiency(),
+                                    8 * pkt->GetSize())));
                             NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [BlackBox_no2 " << (correct ? "does not detect" : "detects") << " errors]");
-                        } else {
-                            correct = (m_random->GetValue() > per);
-                            NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [test: m_random->GetValue () > per]");
                         }
 
                         m_lowMac->ReceivePacketDone(this, pkt, hdr,
@@ -519,31 +481,24 @@ namespace ns3 {
                     } else //DATA FRAME DESTINED FOR THIS DEVICE
                     {
                         //is the payload complete?
-                        if (useBB2) {
-                            correct = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(snr_db, linkBER,
-                                    //BlackBox_no1::PERtoBER (linkPER, 8000),
-                                    mode.GetConstellationSize(),
-                                    mode.GetSpectralEfficiency())));
-                            NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [BlackBox_no2 " << (correct ? "does not detect" : "detects") << " errors]");
-                        } else {
-                            correct = (m_random->GetValue() > per);
-                            NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [test: m_random->GetValue () > per]");
-                        }
+                        correct = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(snr_db, linkBER,
+                                mode.GetConstellationSize(),
+                                mode.GetSpectralEfficiency(),
+                                8 * pkt->GetSize())));
+                        NS_LOG_INFO("FRAME " << (correct ? "CORRECT" : "DAMAGED") << " [BlackBox_no2 " << (correct ? "does not detect" : "detects") << " errors]");
 
                         if (correct) {
                             //no errors - just forward up
                             RemoveFrameCopies(hdr);
                             m_lowMac->ReceivePacketDone(this, pkt, hdr, sinr, mode, true, true, false);
                         } else if ((m_useLOTF)
-                                && (ber <= m_berThr)) //BER > BER THRESHOLD - unusable frame
+                                && (current_ber <= m_berThr)) //BER > BER THRESHOLD - unusable frame
                         {
                             NS_LOG_INFO("PHY HDR OK!, DATA: DAMAGED!");
-                            ber = tag.GetBER();
-                            per = BlackBox_no1::BERtoPER(ber, 8 * pkt->GetSize());
-                            if (AddFrameCopy(pkt, hdr, sinr, per, ber, mode)) //STOR FRAME COPY - check: is it the first one?
+                            if (AddFrameCopy(pkt, hdr, sinr, prev_ber, mode)) //STOR FRAME COPY - check: is it the first one?
                             {
                                 //it is NOT first copy - try to restore data using previously stored frame copies and notify
-                                m_lowMac->ReceivePacketDone(this, pkt, hdr, sinr, mode, true, IsRestored(hdr, useBB2), true);
+                                m_lowMac->ReceivePacketDone(this, pkt, hdr, sinr, mode, true, IsRestored(hdr), true);
                             } else {
                                 //it is first copy - just notify MAC
                                 m_lowMac->ReceivePacketDone(this, pkt, hdr, sinr, mode, true, false, true);
@@ -585,18 +540,17 @@ namespace ns3 {
     }
 
     bool
-    RescuePhy::AddFrameCopy(Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, double per, double ber, RescueMode mode) {
+    RescuePhy::AddFrameCopy(Ptr<Packet> pkt, RescuePhyHeader phyHdr, double sinr, /*double per,*/ double ber, RescueMode mode) {
         NS_LOG_INFO("STORE FRAME COPY");
 
         for (RxFrameAccumulatorI it = m_rxFrameAccumulator.begin(); it != m_rxFrameAccumulator.end(); it++) {
             //NS_LOG_DEBUG("queue iterator = " << ++i << " source: " << it->src << " destination: " << it->dst << " seq. number: " << it->seq_no << " tstamp: " << it->tstamp);
             if ((it->phyHdr.GetSource() == phyHdr.GetSource())
                     && (it->phyHdr.GetSequence() == phyHdr.GetSequence())) {
-                if ((it->snr_db.size() < 3) || !m_useBB2) //BlackBox #2 accepts only 3 copies, so store the best of them
+                if (it->snr_db.size() < 3) //BlackBox #2 accepts only 3 copies, so store the best of them
                 {
                     NS_LOG_INFO(it->snr_db.size() << " PREVIOUS COPY/IES FOUND, ADD THIS COPY");
                     it->snr_db.push_back(sinr);
-                    it->linkPER.push_back(per);
                     it->linkBER.push_back(ber);
                     it->constellationSizes.push_back(mode.GetConstellationSize());
                     it->spectralEfficiencies.push_back(mode.GetSpectralEfficiency());
@@ -610,7 +564,6 @@ namespace ns3 {
                     if (it->linkBER[max_i] > ber) {
                         NS_LOG_INFO(it->snr_db.size() << " PREVIOUS COPIES FOUND, STORE THIS COPY (BER=" << ber << ") INSTEAD OF " << max_i << " (BER=" << it->linkBER[max_i] << ")");
                         it->snr_db[max_i] = sinr;
-                        it->linkPER[max_i] = per;
                         it->linkBER[max_i] = ber;
                         it->constellationSizes[max_i] = mode.GetConstellationSize();
                         it->spectralEfficiencies[max_i] = mode.GetSpectralEfficiency();
@@ -625,9 +578,6 @@ namespace ns3 {
         std::vector<double> snr_db;
         snr_db.push_back(sinr);
 
-        std::vector<double> linkPER;
-        linkPER.push_back(per);
-
         std::vector<double> linkBER;
         linkBER.push_back(ber);
 
@@ -638,10 +588,8 @@ namespace ns3 {
         spectralEfficiencies.push_back(mode.GetSpectralEfficiency());
 
         m_rxFrameAccumulator.push_back(RxFrameCopies(phyHdr, pkt,
-                snr_db, linkPER, linkBER,
-                //mode.GetConstellationSize (),
+                snr_db, linkBER,
                 constellationSizes,
-                //mode.GetSpectralEfficiency (),
                 spectralEfficiencies,
                 pkt->GetSize(),
                 ns3::Simulator::Now()));
@@ -676,7 +624,7 @@ namespace ns3 {
     }
 
     bool
-    RescuePhy::IsRestored(RescuePhyHeader phyHdr, bool useBB2) {
+    RescuePhy::IsRestored(RescuePhyHeader phyHdr) {
         NS_LOG_FUNCTION("");
         bool restored = false;
 
@@ -685,26 +633,15 @@ namespace ns3 {
             //NS_LOG_DEBUG("queue iterator = " << ++i << " source: " << it->src << " destination: " << it->dst << " seq. number: " << it->seq_no << " tstamp: " << it->tstamp);
             if ((it->phyHdr.GetSource() == phyHdr.GetSource())
                     && (it->phyHdr.GetSequence() == phyHdr.GetSequence())) {
-                if (useBB2) {
-                    restored = (0 == (BlackBox_no2::CalculateRescueBitErrorNumber(it->snr_db,
-                            it->linkBER,
-                            //BlackBox_no1::PERtoBER (it->linkPER, 8 * it->packetLength),
-                            it->constellationSizes,
-                            it->spectralEfficiencies)));
-                    NS_LOG_INFO("FRAME " << (restored ? "RESTORED" : "NOT RESTORED") << " [BlackBox_no2 " << (restored ? "does not detect" : "detects") << " errors]");
-                } else {
-                    double blackBoxPER = BlackBox_no1::CalculateRescuePacketErrorRate(it->snr_db,
-                            it->linkPER,
-                            //it->linkBER,
-                            it->constellationSizes,
-                            it->spectralEfficiencies,
-                            8 * it->packetLength);
-                    NS_LOG_DEBUG("BlackBox_no1 PER = " << blackBoxPER);
-                    restored = (m_random->GetValue() > blackBoxPER);
-                    NS_LOG_INFO("FRAME " << (restored ? "RESTORED" : "NOT RESTORED") << " [test: m_random->GetValue () > per]");
-                }
+                int errors = (BlackBox_no2::CalculateRescueBitErrorNumber(it->snr_db,
+                        it->linkBER,
+                        it->constellationSizes,
+                        it->spectralEfficiencies,
+                        8 * it->packetLength));
+                restored = (0 == errors);
+                NS_LOG_INFO("FRAME " << (restored ? "RESTORED" : "NOT RESTORED") << " [BlackBox_no2 returns " << errors << " errors]");
                 if (restored) {
-                    //MAGIC THINGS HAPPENS HERE !!!
+                    //MAGIC THINGS HAVE HAPPENED !!!
                     it = m_rxFrameAccumulator.erase(it);
                     break;
                 }
@@ -727,9 +664,12 @@ namespace ns3 {
     }
 
     Time
-    RescuePhy::CalTxDuration(uint32_t basicSize, uint32_t dataSize, RescueMode basicMode, RescueMode dataMode, uint16_t type) {
+    RescuePhy::CalTxDuration(uint32_t basicSize, uint32_t dataSize, RescueMode basicMode, RescueMode dataMode, uint16_t type, bool centralised) {
+        NS_LOG_FUNCTION("basicSize: " << basicSize << "dataSize: " << dataSize << "basicMode: " << basicMode << "dataMode: " << dataMode << "type:" << type << "centralised: " << (centralised ? "YES" : "NO"));
         //for TX time calculation when PhyHdr is not constructed yet
         RescuePhyHeader hdr = RescuePhyHeader(type);
+        centralised ? hdr.SetCentralisedMacProtocol() : hdr.SetDistributedMacProtocol();
+        NS_LOG_FUNCTION("hdr size: " << hdr.GetSize());
         double_t txHdrTime = (double) (hdr.GetSize() + basicSize) * 8.0 / basicMode.GetDataRate();
         double_t txMpduTime = (double) (dataSize + m_trailerSize) * 8.0 / dataMode.GetDataRate();
         return m_preambleDuration + Seconds(txHdrTime) + Seconds(txMpduTime);
@@ -737,6 +677,7 @@ namespace ns3 {
 
     Time
     RescuePhy::CalTxDuration(uint32_t basicSize, uint32_t dataSize, RescueMode basicMode, RescueMode dataMode) {
+        NS_LOG_FUNCTION("basicSize: " << basicSize << "dataSize: " << dataSize << "basicMode: " << basicMode << "dataMode: " << dataMode);
         //for TX time calculation when PhyHdr is alreade constructed
         double_t txHdrTime = (double) basicSize * 8.0 / basicMode.GetDataRate();
         double_t txMpduTime = (double) (dataSize + m_trailerSize) * 8.0 / dataMode.GetDataRate();

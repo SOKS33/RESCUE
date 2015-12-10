@@ -3,7 +3,7 @@
  * Copyright (c) 2015 AGH Univeristy of Science and Technology
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
+ * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
  *
  * This program is distributed in the hope that it will be useful,
@@ -32,107 +32,119 @@
 #include "rescue-mac-csma.h"
 #include "rescue-phy.h"
 #include "rescue-remote-station-manager.h"
+#include "rescue-arq-manager.h"
 
-NS_LOG_COMPONENT_DEFINE ("AdhocRescueMac");
+NS_LOG_COMPONENT_DEFINE("AdhocRescueMac");
 
 #undef NS_LOG_APPEND_CONTEXT
 #define NS_LOG_APPEND_CONTEXT std::clog << "[time=" << ns3::Simulator::Now() << "] [addr=" << m_address << "] [ADHOC-MAC] "
 
 namespace ns3 {
 
-NS_OBJECT_ENSURE_REGISTERED (AdhocRescueMac);
+    NS_OBJECT_ENSURE_REGISTERED(AdhocRescueMac);
 
-AdhocRescueMac::AdhocRescueMac ()
-  : RescueMac ()
-{
-  NS_LOG_INFO ("");
-  SetTypeOfStation (ADHOC_STA);
-}
+    AdhocRescueMac::AdhocRescueMac()
+    : RescueMac() {
+        NS_LOG_INFO("");
+        SetTypeOfStation(ADHOC_STA);
+    }
 
-AdhocRescueMac::~AdhocRescueMac ()
-{
-  Clear ();
-  m_remoteStationManager = 0;
-  m_csmaMac->Clear ();
-  m_csmaMac = 0;
-}
+    AdhocRescueMac::~AdhocRescueMac() {
+        Clear();
+        m_remoteStationManager = 0;
+        m_arqManager = 0;
+        m_csmaMac->Clear();
+        m_csmaMac = 0;
+    }
 
-void
-AdhocRescueMac::DoInitialize ()
-{
-  NS_LOG_FUNCTION ("");
-  m_phy->NotifyCP ();
-  m_csmaMac->StartOperation ();
-}
+    void
+    AdhocRescueMac::DoInitialize() {
+        NS_LOG_FUNCTION("");
+        m_phy->NotifyCP();
+        m_csmaMac->StartOperation();
+    }
 
-void
-AdhocRescueMac::Clear ()
-{
-}
+    void
+    AdhocRescueMac::Clear() {
+    }
 
-TypeId
-AdhocRescueMac::GetTypeId (void)
-{
-  static TypeId tid = TypeId ("ns3::AdhocRescueMac")
-    .SetParent<RescueMac> ()
-    .AddConstructor<AdhocRescueMac> ()
-  ;
-  return tid;
-}
+    TypeId
+    AdhocRescueMac::GetTypeId(void) {
+        static TypeId tid = TypeId("ns3::AdhocRescueMac")
+                .SetParent<RescueMac> ()
+                .AddConstructor<AdhocRescueMac> ()
+                ;
+        return tid;
+    }
 
 
 
-// ------------------------ Set Functions -----------------------------
+    // ------------------------ Set Functions -----------------------------
 
 
 
-// ------------------------ Get Functions -----------------------------
+    // ------------------------ Get Functions -----------------------------
 
 
 
-// ----------------------- Queue Functions -----------------------------
-void
-AdhocRescueMac::Enqueue (Ptr<Packet> pkt, Mac48Address dst)
-{
-  NS_LOG_INFO ("enqueue packet to :" << dst << 
-               ", size [B]:" << pkt->GetSize ()); 
+    // ----------------------- Queue Functions -----------------------------
 
-  RescueMacHeader hdr = RescueMacHeader (m_address, dst, RESCUE_MAC_PKT_TYPE_DATA);
-  hdr.SetNoRetry ();
-  Ptr<Packet> p = pkt->Copy ();
-  pkt->AddHeader (hdr);
-  if (m_csmaMac->Enqueue (pkt, dst))
-    EnqueueOk (p, hdr);
-}
+    void
+    AdhocRescueMac::Enqueue(Ptr<Packet> pkt, Mac48Address dst) {
+        NS_LOG_INFO("enqueue packet to :" << dst <<
+                ", size [B]:" << pkt->GetSize());
+
+        RescueMacHeader hdr = RescueMacHeader(m_address, dst, RESCUE_MAC_PKT_TYPE_DATA);
+        hdr.SetNoRetry();
+        Ptr<Packet> p = pkt->Copy();
+        pkt->AddHeader(hdr);
+        if (m_csmaMac->Enqueue(pkt, dst))
+            EnqueueOk(p, hdr);
+    }
+
+    void
+    AdhocRescueMac::EnqueueRetry(Ptr<Packet> pkt, Mac48Address dst) {
+        m_csmaMac->EnqueueRetry(pkt, dst);
+    }
+
+    void
+    AdhocRescueMac::EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader ackHdr) {
+        m_csmaMac->EnqueueAck(pkt, ackHdr);
+    }
+
+    // ----------------------- Send Functions ------------------------------
 
 
 
-// ----------------------- Send Functions ------------------------------
+
+    // ---------------------- Receive Functions ----------------------------
+
+    void
+    AdhocRescueMac::ReceivePacket(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("");
+        Ptr<Packet> p = pkt->Copy();
+        RxOk(p, phyHdr);
+        m_forwardUpCb(pkt, phyHdr.GetSource(), phyHdr.GetDestination());
+    }
+
+    void
+    AdhocRescueMac::ReceiveResourceReservation(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("");
+    }
+
+    void
+    AdhocRescueMac::ReceiveBeacon(Ptr<Packet> pkt, RescuePhyHeader phyHdr) {
+        NS_LOG_FUNCTION("");
+    }
 
 
 
+    // ---------------------- Receive Functions ----------------------------
 
-// ---------------------- Receive Functions ----------------------------
-
-void
-AdhocRescueMac::ReceivePacket (Ptr<Packet> pkt, RescuePhyHeader phyHdr)
-{
-  NS_LOG_FUNCTION ("");
-  Ptr<Packet> p = pkt->Copy ();
-  RxOk (p, phyHdr);
-  m_forwardUpCb (pkt, phyHdr.GetSource (), phyHdr.GetDestination ());
-}
-
-void 
-AdhocRescueMac::ReceiveResourceReservation (Ptr<Packet> pkt, RescuePhyHeader phyHdr) 
-{
-  NS_LOG_FUNCTION ("");
-}
-
-void 
-AdhocRescueMac::ReceiveBeacon (Ptr<Packet> pkt, RescuePhyHeader phyHdr)
-{
-  NS_LOG_FUNCTION ("");
-}
+    void
+    AdhocRescueMac::NotifyTxAllowed(void) {
+        NS_LOG_FUNCTION("");
+        m_csmaMac->StartOperation();
+    }
 
 } // namespace ns3

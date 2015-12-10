@@ -3,7 +3,7 @@
  * Copyright (c) 2010 University of Arizona
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as 
+ * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation;
  *
  * This program is distributed in the hope that it will be useful,
@@ -40,58 +40,57 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("RescueSimpleEx");
 
-int main (int argc, char *argv[])
-{
-  LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL);
-  //LogComponentEnable("RescuePhy", LOG_LEVEL_ALL);
-  //LogComponentEnable("RescueChannel", LOG_LEVEL_ALL);
-  
-  uint8_t numNodes = 3;
-  
-  NodeContainer nodes;
-  nodes.Create (numNodes);
-  
-  Ptr<RescueChannel> rescueChan = CreateObject<RescueChannel> ();
-  RescueMacCsmaHelper rescueMac = RescueMacCsmaHelper::Default ();
-  RescuePhyBasicHelper rescuePhy = RescuePhyBasicHelper::Default ();
-  RescueHelper rescue;
-  NetDeviceContainer devices = rescue.Install (nodes, rescueChan, rescuePhy, rescueMac);
-  
-  MobilityHelper mobility;
-  Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
-  positionAlloc->Add (Vector (0.0, 0.0, 0.0));
-  positionAlloc->Add (Vector (150.0, 0.0, 0.0));
-  positionAlloc->Add (Vector (300.0, 0.0, 0.0));
-  mobility.SetPositionAllocator (positionAlloc);
-  mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
-  mobility.Install (nodes);
-  
-  InternetStackHelper internet;
-  internet.Install (nodes);
-  
-  Ipv4AddressHelper ipv4;
-  ipv4.SetBase ("10.1.1.0", "255.255.255.0");
-  Ipv4InterfaceContainer iface = ipv4.Assign (devices);
-  
-  UdpEchoServerHelper echoServer (9);
+int main(int argc, char *argv[]) {
+    LogComponentEnable("RescueMacCsma", LOG_LEVEL_ALL);
+    //LogComponentEnable("RescuePhy", LOG_LEVEL_ALL);
+    //LogComponentEnable("RescueChannel", LOG_LEVEL_ALL);
 
-  ApplicationContainer serverApps = echoServer.Install (nodes.Get (1));
-  serverApps.Start (Seconds (1.0));
-  serverApps.Stop (Seconds (5.0));
+    uint8_t numNodes = 3;
 
-  UdpEchoClientHelper echoClient (iface.GetAddress (1), 9);
-  echoClient.SetAttribute ("MaxPackets", UintegerValue (10));
-  echoClient.SetAttribute ("Interval", TimeValue (Seconds (0.5)));
-  echoClient.SetAttribute ("PacketSize", UintegerValue (500));
+    NodeContainer nodes;
+    nodes.Create(numNodes);
 
-  ApplicationContainer clientApps;
-  clientApps = echoClient.Install (nodes.Get (0));
-  clientApps.Start (Seconds (2.0));
-  clientApps.Stop (Seconds (5.0));
-  
-  Simulator::Run ();
-  Simulator::Destroy ();
+    Ptr<RescueChannel> rescueChan = CreateObject<RescueChannel> ();
+    RescueMacCsmaHelper rescueMac = RescueMacCsmaHelper::Default();
+    RescuePhyBasicHelper rescuePhy = RescuePhyBasicHelper::Default();
+    RescueHelper rescue;
+    NetDeviceContainer devices = rescue.Install(nodes, rescueChan, rescuePhy, rescueMac);
 
-  return 0;
+    MobilityHelper mobility;
+    Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator> ();
+    positionAlloc->Add(Vector(0.0, 0.0, 0.0));
+    positionAlloc->Add(Vector(150.0, 0.0, 0.0));
+    positionAlloc->Add(Vector(300.0, 0.0, 0.0));
+    mobility.SetPositionAllocator(positionAlloc);
+    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    mobility.Install(nodes);
+
+    InternetStackHelper internet;
+    internet.Install(nodes);
+
+    Ipv4AddressHelper ipv4;
+    ipv4.SetBase("10.1.1.0", "255.255.255.0");
+    Ipv4InterfaceContainer iface = ipv4.Assign(devices);
+
+    UdpEchoServerHelper echoServer(9);
+
+    ApplicationContainer serverApps = echoServer.Install(nodes.Get(1));
+    serverApps.Start(Seconds(1.0));
+    serverApps.Stop(Seconds(5.0));
+
+    UdpEchoClientHelper echoClient(iface.GetAddress(1), 9);
+    echoClient.SetAttribute("MaxPackets", UintegerValue(10));
+    echoClient.SetAttribute("Interval", TimeValue(Seconds(0.5)));
+    echoClient.SetAttribute("PacketSize", UintegerValue(500));
+
+    ApplicationContainer clientApps;
+    clientApps = echoClient.Install(nodes.Get(0));
+    clientApps.Start(Seconds(2.0));
+    clientApps.Stop(Seconds(5.0));
+
+    Simulator::Run();
+    Simulator::Destroy();
+
+    return 0;
 }
 

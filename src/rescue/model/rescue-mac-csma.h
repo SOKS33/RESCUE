@@ -23,6 +23,10 @@
 #ifndef RESCUE_MAC_CSMA_H
 #define RESCUE_MAC_CSMA_H
 
+#define MAX_WINDOW_SIZE 255
+#define ARRAY_SIZE 65535
+#define HALF_OF_ARRAY 32767
+
 #include "ns3/nstime.h"
 #include "ns3/simulator.h"
 #include "ns3/event-id.h"
@@ -41,7 +45,6 @@
 
 namespace ns3 {
 
-
     class RescuePhy;
     class RescueChannel;
     class RescueMac;
@@ -57,7 +60,6 @@ namespace ns3 {
     public:
 
         //MODIF
-        //        static std::map<Mac48Address, bool> ControlChannel;
         void printCC();
         void printTopology();
         void updateControlChannel();
@@ -67,7 +69,6 @@ namespace ns3 {
         bool GetDataChannel();
         void updateNeighborhood();
         bool CheckCCForTransmission();
-        //        void resetChannel();
         bool updateLocalControlChannel();
         void TriggeredUpdateControlChannel();
         void triggerNeighborhoodUpdate();
@@ -75,6 +76,21 @@ namespace ns3 {
         std::map<Mac48Address, std::pair<bool, bool>> m_neighbors;
         std::map<Mac48Address, Ptr<RescueMacCsma>> m_neighborsPtr;
         bool m_controlChannel;
+
+
+        //MODIF2
+        void CcaForSifs();
+        void BackoffStartSifs();
+        void ChannelAccessGrantedRelay();
+        void CheckRelaying(RescueMacHeader, Ptr<Packet>);
+
+        void SetTxDuration(Time);
+        Time GetTxDuration();
+        Time m_txDuration;
+
+        void SetChannelDelay(Time);
+        Time GetChannelDelay();
+        Time m_channelDelay;
 
         RescueMacCsma();
         virtual ~RescueMacCsma();
@@ -101,6 +117,10 @@ namespace ns3 {
          * \param manager RescueRemoteStationManager associated with this MAC
          */
         void SetRemoteStationManager(Ptr<RescueRemoteStationManager> manager);
+        /**
+         * \param arqManager RescueArqManager associated with this MAC
+         */
+        void SetArqManager(Ptr<RescueArqManager> arqManager);
 
         /**
          * Assign a fixed random variable stream number to the random variables
@@ -136,10 +156,6 @@ namespace ns3 {
          * \param length the length of queues used by this MAC
          */
         void SetQueueLimits(uint32_t length);
-        /**
-         * \param duration the Basic ACK Timeout duration
-         */
-        void SetBasicAckTimeout(Time duration);
 
         /**
          * \return minimal contention window
@@ -169,10 +185,6 @@ namespace ns3 {
          * \return length the length of queues used by this MAC
          */
         uint32_t GetQueueLimits(void) const;
-        /**
-         * \return duration the Basic ACK Timeout duration
-         */
-        Time GetBasicAckTimeout(void) const;
 
         /**
          * \param pkt the packet to send.
@@ -184,10 +196,33 @@ namespace ns3 {
          */
         virtual bool Enqueue(Ptr<Packet> pkt, Mac48Address dest);
         /**
+         * \param pkt the packet to send.
+         * \param dest the address to which the packet should be sent.
+         *
+         * Used by ARQ manager to enqueue retransmitted packet in retry queue
+         */
+        virtual bool EnqueueRetry(Ptr<Packet> pkt, Mac48Address dest);
+        /**
+         * \param pkt the packet to relay.
+         * \param phyHdr the phy header of this packet.
+         *
+         * Used to enqueue relayed packet in relay queue
+         */
+        virtual bool EnqueueRelay(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+        /**
          * \param pkt the control packet to send.
-         * \param phyHdr the phy header associated with the packet.
+         * \param phyHdr the phy header of this packet.
+         *
+         * Used to enqueue control packet in ctrl queue
          */
         virtual bool EnqueueCtrl(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
+        /**
+         * \param pkt the ACK packet to send.
+         * \param phyHdr the phy header of this packet.
+         *
+         * Used to enqueue ACK packet in ack queue
+         */
+        virtual bool EnqueueAck(Ptr<Packet> pkt, RescuePhyHeader phyHdr);
 
         /**
          * Method used to start operation of this lower MAC entity
@@ -299,7 +334,7 @@ namespace ns3 {
         /**
          * invoked to remove current packet from TX queue
          */
-        void Dequeue();
+        //void Dequeue ();
         /**
          * invoked to remove current control packet from CTRL TX queue
          */
@@ -315,13 +350,12 @@ namespace ns3 {
         /**
          * invoked to transmit ACK frame
          *
-         * \param dest address of acknowledged station
-         * \param seq sequence number of acknowledged DATA frame
+         * \param ackHdr PHY header of ACK frame to send (in fact whole frame)
          * \param dataTxMode acknowledged DATA frame TX mode (RescueMode)
          * \param tag SnrPerTag to notify source about final SNR/PER values of packet
          *            - for possible further use for multi rate control etc.
          */
-        void SendAck(Mac48Address dest, uint16_t seq, RescueMode dataTxMode, SnrPerTag tag);
+        void SendAck(RescuePhyHeader ackHdr, RescueMode dataTxMode, SnrPerTag tag);
         /**
          * invoked to pass the frame to PHY for transmission
          *
@@ -405,7 +439,7 @@ namespace ns3 {
          * \param ackSnr SNR of this ACK frame reception (for further rate control)
          * \param ackMode the mode (RescueMode) of this ACK transmission
          */
-        void ReceiveAck(Ptr<Packet> ackPkt, RescuePhyHeader phyHdr,
+        void ReceiveAck(Ptr<Packet> ackPkt, RescuePhyHeader ackHdr,
                 double ackSnr, RescueMode ackMode);
         /**
          * invoked by ReceivePacketDone to process RESOURCE RESERVATION frame
@@ -431,20 +465,20 @@ namespace ns3 {
          * \param relayedPkt pair of packet for transmission and associated PHY header
          * \return true if packet was already acknowledged
          */
-        bool CheckRelayedFrame(std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt);
+        //bool CheckRelayedFrame (std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt);
         /**
          * lost ACK retransmission
          *
          * \param relayedPkt pair of packet for transmission and associated PHY header
          */
-        void ResendAckFor(std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt);
+        //void ResendAckFor (std::pair<Ptr<Packet>, RescuePhyHeader> relayedPkt);
 
         /**
          * invoked when ACK Timoeut counter expires
          *
          * \param pkt packet for which the timeout has expired (including header)
          */
-        void AckTimeout(Ptr<Packet> pkt);
+        //void AckTimeout (Ptr<Packet> pkt);
         /**
          * invoked to expand contention window value
          */
@@ -456,15 +490,6 @@ namespace ns3 {
          * \return rounded time value
          */
         Time RoundOffTime(Time time);
-        /**
-         * used to check sequence number of incoming frame to prevent
-         * duplicated frame reception
-         *
-         * \param addr address of frame originator
-         * \param seq sequence number of a given frame
-         * \return false if frame is duplicated
-         */
-        bool IsNewSequence(Mac48Address addr, uint16_t seq);
 
         bool m_enabled; //!< True for this CSMA MAC during Contention Period
 
@@ -477,9 +502,7 @@ namespace ns3 {
 
         EventId m_ccaTimeoutEvent; //!< CCA procedure timeout event
         EventId m_backoffTimeoutEvent; //!< BACKOFF procedure timeout event
-        EventId m_ackTimeoutEvent; //!< End-to-end ACK timeout event
         EventId m_sendAckEvent; //!< Event to send ACK
-        EventId m_sendDataEvent; //!< Event to send DATA
 
         // MAC parameters
         uint16_t m_cwMin; //!< Minimal value of contention window
@@ -490,13 +513,11 @@ namespace ns3 {
 
         State m_state; //!< Current state of this MAC
         uint16_t m_cw; //!< Current contention window
-        uint16_t m_sequence; //!< Sequence counter of this MAC (used if ARQ manager is not specified)
         uint8_t m_interleaver; //!< Counter to set interlever
         uint32_t m_queueLimit; //!< Maximal queue(s) size
 
         Time m_backoffRemain; //!< Remaining BACKOFF time
         Time m_backoffStart; //!< The time of last BACKOFF counter start
-        Time m_basicAckTimeout; //!< The maximal duration of ACK awaiting
         Time m_opEnd; //!< The end of current operation period
         Time m_nopBegin; //!< The beginning of next operation period
 
@@ -505,97 +526,31 @@ namespace ns3 {
         std::pair<Ptr<Packet>, RescuePhyHeader> m_pktRelay; //!< Currently RELAYED DATA packet
 
 
+        typedef std::list<Ptr<Packet> > Queue;
+        typedef std::list<Ptr<Packet> >::reverse_iterator QueueRI;
+        typedef std::list<Ptr<Packet> >::iterator QueueI;
+
         //Relay Queue stores MAC frames and PHY headers
         typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> > RelayQueue;
         typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> >::reverse_iterator RelayQueueRI;
         typedef std::list<std::pair<Ptr<Packet>, RescuePhyHeader> >::iterator RelayQueueI;
 
-        std::list<Ptr<Packet> > m_pktQueue; //!< The queue for newly originated frames
+        Queue m_pktQueue; //!< The queue for newly originated frames
+        Queue m_pktRetryQueue; //!< The queue for newly originated frames
         RelayQueue m_pktRelayQueue; //!< The queue for frames to forward
         RelayQueue m_ctrlPktQueue; //!< The queue for control frames to transmit
-        RelayQueue m_ackForwardQueue; //!< The queue for ACK frames to forward
-        RelayQueue m_ackCache; //!< The memory to store recently forwarded ACK in case of retransmission need
+        RelayQueue m_ackQueue; //!< The queue for ACK frames to forward
 
-        bool m_resendAck; //!< to notify that pending ACK is retransmitted
-
-        std::list<std::pair<Mac48Address, uint16_t> > m_seqList; //!< The list of MAC addresses and associated sequence numbers
-
-        /*
-         * List to keep information about transmitted frames in order to prevent loops during flooding
-         */
-        struct FrameInfo {
-            FrameInfo(uint8_t il,
-                    bool ACKed,
-                    bool retried);
-            uint8_t il;
-            bool ACKed;
-            bool retried;
+        struct StoredAck {
+            std::pair<Ptr<Packet>, RescuePhyHeader> ack; //!< The ACK packet
+            Time expires; //!< Lifetime of this ACK packet
         };
-        typedef std::map<uint16_t, struct FrameInfo> SeqIlList;
+        typedef std::list<StoredAck> AckCache;
+        typedef std::list<StoredAck>::reverse_iterator AckCacheRI;
+        typedef std::list<StoredAck>::iterator AckCacheI;
+        AckCache m_ackCache; //!< The memory to store recently forwarded ACK in case of retransmission need
 
-        struct seqIlAck {
-
-            seqIlAck(SeqIlList::iterator& it)
-            : seq(it->first), il(it->second.il),
-            ACKed(it->second.ACKed), retried(it->second.retried) {
-            }
-            const uint16_t& seq;
-            uint8_t& il;
-            bool& ACKed;
-            bool& retried;
-        };
-        typedef std::map<std::pair<Mac48Address, Mac48Address>, SeqIlList> RecvSendSeqList;
-
-        struct srcDstSeqList {
-
-            srcDstSeqList(RecvSendSeqList::iterator& it)
-            : src(it->first.first), dst(it->first.second), seqList(it->second) {
-            }
-            const Mac48Address& src;
-            const Mac48Address& dst;
-            SeqIlList& seqList;
-        };
-        RecvSendSeqList m_sentFrames; //!< List of recently transmitted / relayed frames - to prevent loops
-
-        /*
-         * List to keep information about transmitted frames in order to perform ARQ
-         */
-        typedef std::map<uint16_t, bool> SeqList;
-
-        struct seqAck {
-
-            seqAck(SeqList::iterator& it)
-            : seq(it->first), ACKed(it->second) {
-            }
-            const uint16_t& seq;
-            bool& ACKed;
-        };
-        typedef std::map<Mac48Address, SeqList> SendSeqList;
-
-        struct dstSeqList {
-
-            dstSeqList(SendSeqList::iterator& it)
-            : dst(it->first), seqList(it->second) {
-            }
-            const Mac48Address& dst;
-            SeqList& seqList;
-        };
-        SendSeqList m_createdFrames; //!< List of originated frames - for ARQ
-
-        /*
-         * List to keep information about transmitted frames in order to eliminate duplicates
-         */
-        typedef std::map<Mac48Address, uint16_t> RecvSeqList;
-
-        struct srcSeq {
-
-            srcSeq(RecvSeqList::iterator& it)
-            : src(it->first), seq(it->second) {
-            }
-            const Mac48Address& src;
-            uint16_t& seq;
-        };
-        RecvSeqList m_receivedFrames; //!< List of received frames seq. numbers - to eliminate duplicates
+        //bool m_resendAck; //!< to notify that pending ACK is retransmitted
 
 
 
